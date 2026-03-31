@@ -48,7 +48,7 @@ export async function signup(formData: FormData) {
   }
 
   revalidatePath("/", "layout")
-  redirect("/login?message=" + encodeURIComponent("Check your email to confirm your account."))
+  redirect("/signup?success=" + encodeURIComponent("Account created! Please check your inbox (and spam folder) to confirm your email before signing in."))
 }
 
 export async function logout() {

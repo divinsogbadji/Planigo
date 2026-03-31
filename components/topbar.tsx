@@ -2,6 +2,7 @@
 
 import { Plus, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useTranslation } from "@/lib/i18n"
 
 interface TopbarProps {
   onNewTask?: () => void
@@ -9,11 +10,12 @@ interface TopbarProps {
 }
 
 export function Topbar({ onNewTask, onSuggestPlan }: TopbarProps) {
+  const { t } = useTranslation()
   return (
     <header className="glass flex items-center justify-between border-b border-white/5 px-6 py-4">
       <div>
-        <h2 className="text-lg font-semibold text-white">Dashboard</h2>
-        <p className="text-xs text-muted-foreground">Manage your tasks and plan ahead</p>
+        <h2 className="text-lg font-semibold text-white">{t("topbar.dashboard")}</h2>
+        <p className="text-xs text-muted-foreground">{t("topbar.subtitle")}</p>
       </div>
 
       <div className="flex items-center gap-3">
@@ -23,7 +25,7 @@ export function Topbar({ onNewTask, onSuggestPlan }: TopbarProps) {
           size="lg"
         >
           <Plus className="size-4" data-icon="inline-start" />
-          New Task
+          {t("topbar.newTask")}
         </Button>
 
         <Button
@@ -33,7 +35,7 @@ export function Topbar({ onNewTask, onSuggestPlan }: TopbarProps) {
           size="lg"
         >
           <Sparkles className="size-4" data-icon="inline-start" />
-          Suggest Plan (AI)
+          {t("topbar.suggestPlan")}
         </Button>
       </div>
     </header>

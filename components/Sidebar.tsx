@@ -1,11 +1,12 @@
 "use client"
 import { useState } from "react"
-import { CalendarDays, CalendarRange, ListTodo, User, Briefcase, GraduationCap, Sparkles, LogOut } from "lucide-react"
+import { Archive, CalendarDays, CalendarRange, Globe, ListTodo, User, Briefcase, GraduationCap, Plane, Heart, Wallet, Palette, Sparkles, LogOut } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { logout } from "@/app/(auth)/actions"
+import { useTranslation } from "@/lib/i18n"
 
-export type NavItem = "today" | "week" | "all"
-export type CategoryFilter = "all" | "personal" | "work" | "study"
+export type NavItem = "today" | "week" | "all" | "archived"
+export type CategoryFilter = "all" | "personal" | "work" | "study" | "travel" | "health" | "finance" | "hobby"
 
 interface SidebarProps {
   activeNav?: NavItem
@@ -14,17 +15,22 @@ interface SidebarProps {
   onCategoryChange?: (cat: CategoryFilter) => void
 }
 
-const navItems: { key: NavItem; label: string; icon: React.ElementType }[] = [
-  { key: "today", label: "Today", icon: CalendarDays },
-  { key: "week", label: "Week", icon: CalendarRange },
-  { key: "all", label: "All Tasks", icon: ListTodo },
+const navKeys: { key: NavItem; tKey: "nav.today" | "nav.week" | "nav.allTasks" | "nav.archived"; icon: React.ElementType }[] = [
+  { key: "today", tKey: "nav.today", icon: CalendarDays },
+  { key: "week", tKey: "nav.week", icon: CalendarRange },
+  { key: "all", tKey: "nav.allTasks", icon: ListTodo },
+  { key: "archived", tKey: "nav.archived", icon: Archive },
 ]
 
-const categoryItems: { key: CategoryFilter; label: string; icon: React.ElementType; color: string }[] = [
-  { key: "all", label: "All", icon: Sparkles, color: "text-purple-400" },
-  { key: "personal", label: "Personal", icon: User, color: "text-emerald-400" },
-  { key: "work", label: "Work", icon: Briefcase, color: "text-blue-400" },
-  { key: "study", label: "Study", icon: GraduationCap, color: "text-amber-400" },
+const catKeys: { key: CategoryFilter; tKey: "cat.all" | "cat.personal" | "cat.work" | "cat.study" | "cat.travel" | "cat.health" | "cat.finance" | "cat.hobby"; icon: React.ElementType; color: string }[] = [
+  { key: "all", tKey: "cat.all", icon: Sparkles, color: "text-purple-400" },
+  { key: "personal", tKey: "cat.personal", icon: User, color: "text-emerald-400" },
+  { key: "work", tKey: "cat.work", icon: Briefcase, color: "text-blue-400" },
+  { key: "study", tKey: "cat.study", icon: GraduationCap, color: "text-amber-400" },
+  { key: "travel", tKey: "cat.travel", icon: Plane, color: "text-cyan-400" },
+  { key: "health", tKey: "cat.health", icon: Heart, color: "text-rose-400" },
+  { key: "finance", tKey: "cat.finance", icon: Wallet, color: "text-lime-400" },
+  { key: "hobby", tKey: "cat.hobby", icon: Palette, color: "text-fuchsia-400" },
 ]
 
 export function Sidebar({ activeNav: controlledNav, activeCategory: controlledCategory, onNavChange, onCategoryChange }: SidebarProps) {
@@ -32,6 +38,7 @@ export function Sidebar({ activeNav: controlledNav, activeCategory: controlledCa
   const [internalCategory, setInternalCategory] = useState<CategoryFilter>("all")
   const activeNav = controlledNav ?? internalNav
   const activeCategory = controlledCategory ?? internalCategory
+  const { t, locale, setLocale } = useTranslation()
 
   function handleNav(nav: NavItem) { setInternalNav(nav); onNavChange?.(nav) }
   function handleCategory(cat: CategoryFilter) { setInternalCategory(cat); onCategoryChange?.(cat) }
@@ -46,14 +53,14 @@ export function Sidebar({ activeNav: controlledNav, activeCategory: controlledCa
       </div>
 
       <div className="space-y-1">
-        <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Navigation</p>
-        {navItems.map((item) => {
+        <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{t("nav.navigation")}</p>
+        {navKeys.map((item) => {
           const Icon = item.icon
           const isActive = activeNav === item.key
           return (
             <button key={item.key} onClick={() => handleNav(item.key)} className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${isActive ? "glass-card text-white shadow-3d" : "text-muted-foreground hover:bg-white/5 hover:text-white"}`}>
               <Icon className={`size-4 transition-colors ${isActive ? "text-purple-400" : "text-muted-foreground group-hover:text-white"}`} />
-              {item.label}
+              {t(item.tKey)}
             </button>
           )
         })}
@@ -62,14 +69,14 @@ export function Sidebar({ activeNav: controlledNav, activeCategory: controlledCa
       <Separator className="my-5 bg-white/5" />
 
       <div className="space-y-1">
-        <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Categories</p>
-        {categoryItems.map((item) => {
+        <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{t("nav.categories")}</p>
+        {catKeys.map((item) => {
           const Icon = item.icon
           const isActive = activeCategory === item.key
           return (
             <button key={item.key} onClick={() => handleCategory(item.key)} className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${isActive ? "glass-card text-white shadow-3d" : "text-muted-foreground hover:bg-white/5 hover:text-white"}`}>
               <Icon className={`size-4 ${item.color}`} />
-              {item.label}
+              {t(item.tKey)}
             </button>
           )
         })}
@@ -77,10 +84,19 @@ export function Sidebar({ activeNav: controlledNav, activeCategory: controlledCa
 
       <div className="flex-1" />
 
+      <button
+        type="button"
+        onClick={() => setLocale(locale === "en" ? "fr" : "en")}
+        className="mb-2 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-white/5 hover:text-white"
+      >
+        <Globe className="size-4" />
+        {t("lang.toggle")}
+      </button>
+
       <form action={logout}>
         <button type="submit" className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-red-500/10 hover:text-red-400">
           <LogOut className="size-4" />
-          Sign out
+          {t("nav.signOut")}
         </button>
       </form>
     </aside>

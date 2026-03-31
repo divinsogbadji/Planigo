@@ -3,7 +3,7 @@
 // Must stay in sync with the Supabase `tasks` table
 // ──────────────────────────────────────
 
-export type Category = "personal" | "work" | "study"
+export type Category = "personal" | "work" | "study" | "travel" | "health" | "finance" | "hobby"
 
 export type Status = "todo" | "in_progress" | "done"
 
@@ -20,11 +20,12 @@ export interface Task {
   due_date: string | null      // ISO-8601 timestamp
   duration: string | null
   priority: Priority
+  is_archived: boolean         // true = archived (hidden from main view)
   created_at: string           // ISO-8601 timestamp
 }
 
-/** Payload for creating a new task (server fills id, user_id, created_at) */
-export type TaskInsert = Omit<Task, "id" | "user_id" | "created_at">
+/** Payload for creating a new task (server fills id, user_id, created_at; is_archived defaults to false) */
+export type TaskInsert = Omit<Task, "id" | "user_id" | "created_at" | "is_archived">
 
 /** Payload for updating a task (all fields optional except id) */
 export type TaskUpdate = Partial<TaskInsert> & { id: string }

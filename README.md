@@ -90,6 +90,7 @@ create table tasks (
   priority text not null default 'medium',
   due_date timestamptz,
   duration text,
+  is_archived boolean not null default false,
   created_at timestamptz default now()
 );
 

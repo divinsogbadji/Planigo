@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useTranslation } from "@/lib/i18n"
 import type { Task } from "@/types/task"
 
 interface CalendarViewProps {
@@ -11,6 +12,7 @@ interface CalendarViewProps {
 }
 
 export function CalendarView({ tasks, onReschedule }: CalendarViewProps) {
+  const { t, locale } = useTranslation()
   const [weekOffset, setWeekOffset] = useState(0)
   const [dragOverDay, setDragOverDay] = useState<string | null>(null)
 
@@ -60,7 +62,8 @@ export function CalendarView({ tasks, onReschedule }: CalendarViewProps) {
     }
   }
 
-  const weekLabel = `${weekDays[0].toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${weekDays[6].toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+  const dtLocale = locale === "fr" ? "fr-FR" : "en-US"
+  const weekLabel = `${weekDays[0].toLocaleDateString(dtLocale, { month: "short", day: "numeric" })} – ${weekDays[6].toLocaleDateString(dtLocale, { month: "short", day: "numeric" })}`
 
   return (
     <div className="glass-card rounded-xl p-4 shadow-3d">
@@ -72,7 +75,7 @@ export function CalendarView({ tasks, onReschedule }: CalendarViewProps) {
         <div className="flex items-center gap-1">
           {weekOffset !== 0 && (
             <Button variant="ghost" size="icon-xs" onClick={() => setWeekOffset(0)} className="text-xs text-muted-foreground hover:text-white">
-              Today
+              {t("cal.today")}
             </Button>
           )}
           <Button variant="ghost" size="icon-xs" onClick={() => setWeekOffset((o) => o - 1)} className="text-muted-foreground hover:text-white">
@@ -104,7 +107,7 @@ export function CalendarView({ tasks, onReschedule }: CalendarViewProps) {
               }`}
             >
               <span className="text-[10px] font-medium uppercase text-muted-foreground">
-                {day.toLocaleDateString("en-US", { weekday: "short" })}
+                {day.toLocaleDateString(dtLocale, { weekday: "short" })}
               </span>
               <span className={`mt-0.5 text-lg font-bold ${isToday(day) ? "text-purple-300" : "text-white"}`}>
                 {day.getDate()}
@@ -123,7 +126,7 @@ export function CalendarView({ tasks, onReschedule }: CalendarViewProps) {
                     </span>
                   ))}
                   {dayTasks.length > 3 && (
-                    <span className="text-[8px] text-muted-foreground">+{dayTasks.length - 3} more</span>
+                    <span className="text-[8px] text-muted-foreground">{t("cal.more", { count: dayTasks.length - 3 })}</span>
                   )}
                 </div>
               )}

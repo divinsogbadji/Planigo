@@ -5,8 +5,10 @@ import { Sparkles, Loader2, Check, X } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { useTranslation } from "@/lib/i18n"
 import type { AISuggestedTask } from "@/types/task"
 
 interface AISuggestDialogProps {
@@ -16,6 +18,7 @@ interface AISuggestDialogProps {
 }
 
 export function AISuggestDialog({ open, onOpenChange, onConfirm }: AISuggestDialogProps) {
+  const { t } = useTranslation()
   const [goal, setGoal] = useState("")
   const [deadline, setDeadline] = useState("")
   const [loading, setLoading] = useState(false)
@@ -27,9 +30,9 @@ export function AISuggestDialog({ open, onOpenChange, onConfirm }: AISuggestDial
 
   function validateGoal(value: string): string | null {
     const trimmed = value.trim()
-    if (!trimmed) return "Please describe your goal"
-    if (trimmed.length < 5) return "Goal must be at least 5 characters"
-    if (trimmed.length > 300) return "Goal must be less than 300 characters"
+    if (!trimmed) return t("ai.goalRequired")
+    if (trimmed.length < 5) return t("ai.goalMin")
+    if (trimmed.length > 500) return t("ai.goalMax")
     return null
   }
 
@@ -98,37 +101,37 @@ export function AISuggestDialog({ open, onOpenChange, onConfirm }: AISuggestDial
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-white">
             <Sparkles className="size-5 text-purple-400" />
-            AI Task Planner
+            {t("ai.title")}
           </DialogTitle>
         </DialogHeader>
 
         {suggestions.length === 0 ? (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="goal">What do you want to accomplish? <span className="text-red-400">*</span></Label>
-              <Input
+              <Label htmlFor="goal" className="text-white">{t("ai.goalLabel")} <span className="text-red-400">*</span></Label>
+              <Textarea
                 id="goal"
-                placeholder="e.g. Prepare for final exams in 2 weeks"
+                placeholder={t("ai.goalPlaceholder")}
                 value={goal}
+                rows={4}
                 onChange={(e) => {
                   setGoal(e.target.value)
                   if (goalTouched) setGoalError(validateGoal(e.target.value))
                 }}
                 onBlur={() => { setGoalTouched(true); setGoalError(validateGoal(goal)) }}
-                onKeyDown={(e) => e.key === "Enter" && handleGenerate()}
                 aria-invalid={!!goalError && goalTouched}
-                className={goalError && goalTouched ? "border-red-500/50 focus-visible:border-red-500 focus-visible:ring-red-500/20" : ""}
+                className={`min-h-[100px] resize-none text-white placeholder:text-white/40 ${goalError && goalTouched ? "border-red-500/50 focus-visible:border-red-500 focus-visible:ring-red-500/20" : ""}`}
               />
               {goalError && goalTouched && <p className="text-xs text-red-400">{goalError}</p>}
               <div className="flex justify-end">
-                <span className={`text-[10px] ${goal.trim().length > 250 ? "text-amber-400" : "text-muted-foreground"}`}>
-                  {goal.trim().length}/300
+                <span className={`text-[10px] ${goal.trim().length > 400 ? "text-amber-400" : "text-muted-foreground"}`}>
+                  {goal.trim().length}/500
                 </span>
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="deadline">Deadline (optional)</Label>
-              <Input id="deadline" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+              <Label htmlFor="deadline" className="text-white">{t("ai.deadline")}</Label>
+              <Input id="deadline" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="text-white" />
             </div>
             {error && (
               <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
@@ -137,12 +140,12 @@ export function AISuggestDialog({ open, onOpenChange, onConfirm }: AISuggestDial
               </div>
             )}
             <Button onClick={handleGenerate} disabled={loading || !goal.trim()} className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-600 hover:to-purple-700">
-              {loading ? <><Loader2 className="size-4 animate-spin" /> Generating...</> : <><Sparkles className="size-4" /> Generate Plan</>}
+              {loading ? <><Loader2 className="size-4 animate-spin" /> {t("ai.generating")}</> : <><Sparkles className="size-4" /> {t("ai.generatePlan")}</>}
             </Button>
           </div>
         ) : (
           <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">Select the tasks you want to add ({selected.size}/{suggestions.length} selected)</p>
+            <p className="text-xs text-white/70">{t("ai.selectTasks")} ({selected.size}/{suggestions.length} {t("ai.selected")})</p>
             <div className="max-h-[320px] space-y-2 overflow-y-auto pr-1">
               {suggestions.map((task, i) => (
                 <button key={i} onClick={() => toggleSelect(i)} className={`glass-card flex w-full items-start gap-3 rounded-lg p-3 text-left transition-all duration-200 ${selected.has(i) ? "ring-1 ring-purple-500/40" : "opacity-50"}`}>
@@ -162,10 +165,10 @@ export function AISuggestDialog({ open, onOpenChange, onConfirm }: AISuggestDial
             </div>
             <DialogFooter className="gap-2">
               <Button variant="outline" onClick={() => setSuggestions([])} size="sm">
-                <X className="size-3" /> Regenerate
+                <X className="size-3" /> {t("ai.regenerate")}
               </Button>
               <Button onClick={handleConfirm} disabled={selected.size === 0} size="sm" className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-600 hover:to-purple-700">
-                <Check className="size-3" /> Add {selected.size} Task{selected.size !== 1 ? "s" : ""}
+                <Check className="size-3" /> {selected.size !== 1 ? t("ai.addTasks", { count: selected.size }) : t("ai.addTask", { count: selected.size })}
               </Button>
             </DialogFooter>
           </div>

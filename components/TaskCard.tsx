@@ -1,14 +1,19 @@
 "use client"
 
-import { Calendar, Clock, Pencil, Trash2 } from "lucide-react"
+import { Archive, Calendar, Clock, Pencil, RotateCcw, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useTranslation } from "@/lib/i18n"
 import type { Task } from "@/types/task"
 
 const categoryStyles: Record<string, string> = {
   personal: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
   work: "bg-blue-500/15 text-blue-400 border-blue-500/20",
   study: "bg-amber-500/15 text-amber-400 border-amber-500/20",
+  travel: "bg-cyan-500/15 text-cyan-400 border-cyan-500/20",
+  health: "bg-rose-500/15 text-rose-400 border-rose-500/20",
+  finance: "bg-lime-500/15 text-lime-400 border-lime-500/20",
+  hobby: "bg-fuchsia-500/15 text-fuchsia-400 border-fuchsia-500/20",
 }
 
 const priorityDot: Record<string, string> = {
@@ -21,12 +26,19 @@ interface TaskCardProps {
   task: Task
   onEdit?: (task: Task) => void
   onDelete?: (taskId: string) => void
+  onArchive?: (taskId: string) => void
+  onRestore?: (taskId: string) => void
+  isArchiveView?: boolean
 }
 
-export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
+export function TaskCard({ task, onEdit, onDelete, onArchive, onRestore, isArchiveView }: TaskCardProps) {
+  const { t, locale } = useTranslation()
   const dueLabel = task.due_date
-    ? new Date(task.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    ? new Date(task.due_date).toLocaleDateString(locale === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric" })
     : null
+
+  const categoryKey = `cat.${task.category}` as "cat.personal" | "cat.work" | "cat.study" | "cat.travel" | "cat.health" | "cat.finance" | "cat.hobby"
+  const priorityKey = `priority.${task.priority}` as "priority.low" | "priority.medium" | "priority.high"
 
   return (
     <div className="glass-card group animate-fade-up cursor-pointer rounded-xl p-4 shadow-3d transition-all duration-200 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-3d-lg">
@@ -34,12 +46,28 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
       <div className="mb-2 flex items-start justify-between gap-2">
         <h3 className="text-sm font-semibold text-white leading-snug">{task.title}</h3>
         <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-          <Button variant="ghost" size="icon-xs" onClick={() => onEdit?.(task)} className="text-muted-foreground hover:text-white">
-            <Pencil />
-          </Button>
-          <Button variant="ghost" size="icon-xs" onClick={() => onDelete?.(task.id)} className="text-muted-foreground hover:text-red-400">
-            <Trash2 />
-          </Button>
+          {isArchiveView ? (
+            <>
+              <Button variant="ghost" size="icon-xs" onClick={() => onRestore?.(task.id)} className="text-muted-foreground hover:text-emerald-400" title={t("task.restore")}>
+                <RotateCcw />
+              </Button>
+              <Button variant="ghost" size="icon-xs" onClick={() => onDelete?.(task.id)} className="text-muted-foreground hover:text-red-400" title={t("task.deletePermanently")}>
+                <Trash2 />
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" size="icon-xs" onClick={() => onEdit?.(task)} className="text-muted-foreground hover:text-white" title={t("task.edit")}>
+                <Pencil />
+              </Button>
+              <Button variant="ghost" size="icon-xs" onClick={() => onArchive?.(task.id)} className="text-muted-foreground hover:text-amber-400" title={t("task.archive")}>
+                <Archive />
+              </Button>
+              <Button variant="ghost" size="icon-xs" onClick={() => onDelete?.(task.id)} className="text-muted-foreground hover:text-red-400" title={t("task.delete")}>
+                <Trash2 />
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -51,12 +79,12 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
       {/* Footer: badges + meta */}
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline" className={categoryStyles[task.category] ?? ""}>
-          {task.category}
+          {t(categoryKey)}
         </Badge>
 
         <span className="flex items-center gap-1">
           <span className={`size-1.5 rounded-full ${priorityDot[task.priority]}`} />
-          <span className="text-[10px] text-muted-foreground capitalize">{task.priority}</span>
+          <span className="text-[10px] text-muted-foreground">{t(priorityKey)}</span>
         </span>
 
         {dueLabel && (

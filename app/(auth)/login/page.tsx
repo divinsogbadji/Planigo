@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react"
+import { useTranslation } from "@/lib/i18n"
 
 interface FieldErrors {
   email?: string
@@ -27,6 +28,7 @@ function LoginForm() {
   const searchParams = useSearchParams()
   const serverError = searchParams.get("error")
   const serverMessage = searchParams.get("message")
+  const { t } = useTranslation()
 
   const [errors, setErrors] = useState<FieldErrors>({})
   const [submitting, setSubmitting] = useState(false)
@@ -37,15 +39,15 @@ function LoginForm() {
     const password = (formData.get("password") as string) ?? ""
 
     if (!email) {
-      errs.email = "Email is required"
+      errs.email = t("login.emailRequired")
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errs.email = "Please enter a valid email address"
+      errs.email = t("login.emailInvalid")
     }
 
     if (!password) {
-      errs.password = "Password is required"
+      errs.password = t("login.passwordRequired")
     } else if (password.length < 6) {
-      errs.password = "Password must be at least 6 characters"
+      errs.password = t("login.passwordMin")
     }
 
     return errs
@@ -65,8 +67,8 @@ function LoginForm() {
     <div className="flex min-h-svh items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Planigo</CardTitle>
-          <CardDescription>Sign in to your account</CardDescription>
+          <CardTitle className="text-2xl font-bold">{t("login.title")}</CardTitle>
+          <CardDescription>{t("login.subtitle")}</CardDescription>
         </CardHeader>
         <CardContent>
           {serverError && (
@@ -84,7 +86,7 @@ function LoginForm() {
 
           <form action={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t("login.email")}</Label>
               <Input
                 id="email"
                 name="email"
@@ -97,7 +99,7 @@ function LoginForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t("login.password")}</Label>
               <Input
                 id="password"
                 name="password"
@@ -110,14 +112,14 @@ function LoginForm() {
             </div>
 
             <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? <><Loader2 className="size-4 animate-spin" /> Signing in...</> : "Sign in"}
+              {submitting ? <><Loader2 className="size-4 animate-spin" /> {t("login.signingIn")}</> : t("login.signIn")}
             </Button>
           </form>
 
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
+            {t("login.noAccount")}{" "}
             <Link href="/signup" className="text-primary underline underline-offset-4 hover:text-primary/80">
-              Sign up
+              {t("login.signUp")}
             </Link>
           </p>
         </CardContent>

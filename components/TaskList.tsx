@@ -9,9 +9,12 @@ interface TaskListProps {
   tasks: Task[]
   onEditTask?: (task: Task) => void
   onDeleteTask?: (taskId: string) => void
+  onArchiveTask?: (taskId: string) => void
+  onRestoreTask?: (taskId: string) => void
+  isArchiveView?: boolean
 }
 
-export function TaskList({ tasks, onEditTask, onDeleteTask }: TaskListProps) {
+export function TaskList({ tasks, onEditTask, onDeleteTask, onArchiveTask, onRestoreTask, isArchiveView }: TaskListProps) {
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
       {columns.map((status) => (
@@ -21,6 +24,9 @@ export function TaskList({ tasks, onEditTask, onDeleteTask }: TaskListProps) {
           tasks={tasks.filter((t) => t.status === status)}
           onEditTask={onEditTask}
           onDeleteTask={onDeleteTask}
+          onArchiveTask={onArchiveTask}
+          onRestoreTask={onRestoreTask}
+          isArchiveView={isArchiveView}
         />
       ))}
     </div>

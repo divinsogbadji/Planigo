@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CheckCircle2 } from "lucide-react"
+import { useTranslation } from "@/lib/i18n"
 import type { Task, TaskInsert, Category, Status, Priority } from "@/types/task"
 
 interface TaskFormProps {
@@ -37,6 +38,7 @@ const durationRegex = /^[0-9]+[mhd]?$/i
 
 export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) {
   const isEditing = !!task
+  const { t } = useTranslation()
   const [form, setForm] = useState<TaskInsert>(defaultValues)
   const [errors, setErrors] = useState<FieldErrors>({})
   const [touched, setTouched] = useState<Set<string>>(new Set())
@@ -45,13 +47,13 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
   useEffect(() => {
     if (task) {
       setForm({
-        title: task.title,
+        title: task.title ?? "",
         description: task.description ?? "",
-        category: task.category,
-        status: task.status,
+        category: task.category ?? "personal",
+        status: task.status ?? "todo",
         due_date: task.due_date,
         duration: task.duration,
-        priority: task.priority,
+        priority: task.priority ?? "medium",
       })
     } else {
       setForm(defaultValues)
@@ -64,19 +66,19 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
   function validate(data: TaskInsert): FieldErrors {
     const errs: FieldErrors = {}
     if (!data.title.trim()) {
-      errs.title = "Title is required"
+      errs.title = t("form.titleRequired")
     } else if (data.title.trim().length < 2) {
-      errs.title = "Title must be at least 2 characters"
+      errs.title = t("form.titleMin")
     } else if (data.title.trim().length > 100) {
-      errs.title = "Title must be less than 100 characters"
+      errs.title = t("form.titleMax")
     }
 
     if (data.description && data.description.length > 500) {
-      errs.description = "Description must be less than 500 characters"
+      errs.description = t("form.descriptionMax")
     }
 
     if (data.duration && !durationRegex.test(data.duration)) {
-      errs.duration = "Use format: 30m, 2h, or 1d"
+      errs.duration = t("form.durationFormat")
     }
 
     return errs
@@ -110,7 +112,7 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
       onSubmit(form)
     }
 
-    setSuccessMsg(isEditing ? "Task updated successfully!" : "Task created successfully!")
+    setSuccessMsg(isEditing ? t("form.taskUpdated") : t("form.taskCreated"))
     setTimeout(() => {
       setSuccessMsg(null)
       onOpenChange(false)
@@ -129,7 +131,7 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="glass border-white/10 sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-white">{isEditing ? "Edit Task" : "New Task"}</DialogTitle>
+          <DialogTitle className="text-white">{isEditing ? t("form.editTask") : t("form.newTask")}</DialogTitle>
         </DialogHeader>
 
         {successMsg ? (
@@ -142,11 +144,11 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="title">Title <span className="text-red-400">*</span></Label>
+              <Label htmlFor="title">{t("form.title")} <span className="text-red-400">*</span></Label>
               <div className="relative">
                 <Input
                   id="title"
-                  placeholder="Task title..."
+                  placeholder={t("form.titlePlaceholder")}
                   value={form.title}
                   onChange={(e) => handleChange("title", e.target.value)}
                   onBlur={() => handleBlur("title")}
@@ -161,10 +163,10 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">{t("form.description")}</Label>
               <Textarea
                 id="description"
-                placeholder="Optional description..."
+                placeholder={t("form.descriptionPlaceholder")}
                 value={form.description ?? ""}
                 onChange={(e) => handleChange("description", e.target.value)}
                 onBlur={() => handleBlur("description")}
@@ -182,24 +184,28 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Category</Label>
+                <Label>{t("form.category")}</Label>
                 <Select value={form.category} onValueChange={(v) => handleChange("category", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="personal">Personal</SelectItem>
-                    <SelectItem value="work">Work</SelectItem>
-                    <SelectItem value="study">Study</SelectItem>
+                    <SelectItem value="personal">{t("cat.personal")}</SelectItem>
+                    <SelectItem value="work">{t("cat.work")}</SelectItem>
+                    <SelectItem value="study">{t("cat.study")}</SelectItem>
+                    <SelectItem value="travel">{t("cat.travel")}</SelectItem>
+                    <SelectItem value="health">{t("cat.health")}</SelectItem>
+                    <SelectItem value="finance">{t("cat.finance")}</SelectItem>
+                    <SelectItem value="hobby">{t("cat.hobby")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Priority</Label>
+                <Label>{t("form.priority")}</Label>
                 <Select value={form.priority} onValueChange={(v) => handleChange("priority", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="low">{t("priority.low")}</SelectItem>
+                    <SelectItem value="medium">{t("priority.medium")}</SelectItem>
+                    <SelectItem value="high">{t("priority.high")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -207,13 +213,13 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
 
             {isEditing && (
               <div className="space-y-2">
-                <Label>Status</Label>
+                <Label>{t("form.status")}</Label>
                 <Select value={form.status} onValueChange={(v) => handleChange("status", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="todo">To Do</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="done">Done</SelectItem>
+                    <SelectItem value="todo">{t("status.todo")}</SelectItem>
+                    <SelectItem value="in_progress">{t("status.inProgress")}</SelectItem>
+                    <SelectItem value="done">{t("status.done")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -221,14 +227,14 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label htmlFor="due_date">Due Date</Label>
+                <Label htmlFor="due_date">{t("form.dueDate")}</Label>
                 <Input id="due_date" type="datetime-local" value={form.due_date ?? ""} onChange={(e) => handleChange("due_date", e.target.value || null)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="duration">Duration</Label>
+                <Label htmlFor="duration">{t("form.duration")}</Label>
                 <Input
                   id="duration"
-                  placeholder="e.g. 2h, 30m, 1d"
+                  placeholder={t("form.durationPlaceholder")}
                   value={form.duration ?? ""}
                   onChange={(e) => handleChange("duration", e.target.value || null)}
                   onBlur={() => handleBlur("duration")}
@@ -239,9 +245,9 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>{t("form.cancel")}</Button>
               <Button type="submit" className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-600 hover:to-purple-700">
-                {isEditing ? "Save Changes" : "Create Task"}
+                {isEditing ? t("form.saveChanges") : t("form.createTask")}
               </Button>
             </DialogFooter>
           </form>
