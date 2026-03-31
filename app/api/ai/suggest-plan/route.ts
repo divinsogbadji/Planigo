@@ -44,11 +44,17 @@ Format:
 ]
 `
 
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+      console.error("OPENAI_API_KEY is not set")
+      return NextResponse.json({ error: "AI service not configured" }, { status: 503 })
+    }
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
@@ -57,9 +63,19 @@ Format:
       }),
     })
 
+    if (!response.ok) {
+      const err = await response.text()
+      console.error("OpenAI API error:", response.status, err)
+      return NextResponse.json({ error: "AI request failed" }, { status: 502 })
+    }
+
     const data = await response.json()
 
     let content = data.choices?.[0]?.message?.content
+    if (!content) {
+      console.error("No content in AI response:", JSON.stringify(data))
+      return NextResponse.json({ error: "Empty AI response" }, { status: 502 })
+    }
 
     // 🧠 Clean JSON (important)
     content = content.replace(/```json|```/g, "").trim()
