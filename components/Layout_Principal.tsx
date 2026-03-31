@@ -35,6 +35,7 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
   const [feedbackEmail, setFeedbackEmail] = useState("")
   const [feedbackSending, setFeedbackSending] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [feedbackErrors, setFeedbackErrors] = useState<{ message?: string; email?: string }>({})
 
   const isArchiveView = activeNav === "archived"
 
@@ -165,10 +166,18 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
   }, [supabase, userId, toast])
 
   const handleFeedback = useCallback(async () => {
-    if (!feedbackMsg.trim()) {
-      toast("error", t("footer.feedbackRequired"))
+    const errs: { message?: string; email?: string } = {}
+    if (!feedbackMsg.trim() || feedbackMsg.trim().length < 3) {
+      errs.message = t("footer.feedbackRequired")
+    }
+    if (feedbackEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(feedbackEmail)) {
+      errs.email = t("footer.feedbackInvalidEmail")
+    }
+    if (Object.keys(errs).length > 0) {
+      setFeedbackErrors(errs)
       return
     }
+    setFeedbackErrors({})
     setFeedbackSending(true)
     try {
       const res = await fetch("/api/feedback", {
@@ -230,52 +239,54 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
             isArchiveView={isArchiveView}
           />
 
-          {/* Footer: Copyright + Feedback */}
-          <footer className="mt-8 border-t border-white/5 pt-6 pb-4">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <p className="text-xs text-muted-foreground">{t("footer.copyright")}</p>
-
-              <div className="flex flex-col items-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setFeedbackOpen(!feedbackOpen)}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-white"
-                >
-                  <MessageSquare className="size-3.5" />
-                  {t("footer.feedbackTitle")}
-                </button>
-
-                {feedbackOpen && (
-                  <div className="glass-card w-full space-y-2 rounded-lg border border-white/10 p-3 sm:w-72">
-                    <Textarea
-                      placeholder={t("footer.feedbackPlaceholder")}
-                      value={feedbackMsg}
-                      onChange={(e) => setFeedbackMsg(e.target.value)}
-                      className="min-h-[60px] resize-none border-white/10 bg-white/5 text-sm text-white placeholder:text-white/40"
-                      maxLength={2000}
-                    />
-                    <Input
-                      placeholder={t("footer.feedbackEmail")}
-                      value={feedbackEmail}
-                      onChange={(e) => setFeedbackEmail(e.target.value)}
-                      className="border-white/10 bg-white/5 text-sm text-white placeholder:text-white/40"
-                    />
-                    <Button
-                      size="sm"
-                      onClick={handleFeedback}
-                      disabled={feedbackSending}
-                      className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-600 hover:to-purple-700"
-                    >
-                      {feedbackSending ? (
-                        <><Loader2 className="size-3 animate-spin" /> {t("footer.feedbackSending")}</>
-                      ) : (
-                        <><Send className="size-3" /> {t("footer.feedbackSend")}</>
-                      )}
-                    </Button>
-                  </div>
-                )}
-              </div>
+          {/* Footer */}
+          <footer className="mt-4 border-t border-white/5 py-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] text-muted-foreground">{t("footer.copyright")}</p>
+              <button
+                type="button"
+                onClick={() => { setFeedbackOpen(!feedbackOpen); setFeedbackErrors({}) }}
+                className="flex items-center gap-1 text-[10px] text-muted-foreground transition-colors hover:text-white"
+              >
+                <MessageSquare className="size-3" />
+                {t("footer.feedbackTitle")}
+              </button>
             </div>
+            {feedbackOpen && (
+              <div className="mt-2 space-y-1.5 rounded-lg border border-white/10 bg-white/5 p-2.5 sm:max-w-xs sm:ml-auto">
+                <div>
+                  <Textarea
+                    placeholder={t("footer.feedbackPlaceholder")}
+                    value={feedbackMsg}
+                    onChange={(e) => { setFeedbackMsg(e.target.value); setFeedbackErrors(prev => ({ ...prev, message: undefined })) }}
+                    className="min-h-[48px] resize-none border-white/10 bg-white/5 text-xs text-white placeholder:text-white/40"
+                    maxLength={2000}
+                  />
+                  {feedbackErrors.message && <p className="mt-0.5 text-[11px] text-red-400">{feedbackErrors.message}</p>}
+                </div>
+                <div>
+                  <Input
+                    placeholder={t("footer.feedbackEmail")}
+                    value={feedbackEmail}
+                    onChange={(e) => { setFeedbackEmail(e.target.value); setFeedbackErrors(prev => ({ ...prev, email: undefined })) }}
+                    className="border-white/10 bg-white/5 text-xs text-white placeholder:text-white/40 h-7"
+                  />
+                  {feedbackErrors.email && <p className="mt-0.5 text-[11px] text-red-400">{feedbackErrors.email}</p>}
+                </div>
+                <Button
+                  size="sm"
+                  onClick={handleFeedback}
+                  disabled={feedbackSending}
+                  className="h-7 w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-xs text-white hover:from-indigo-600 hover:to-purple-700"
+                >
+                  {feedbackSending ? (
+                    <><Loader2 className="size-3 animate-spin" /> {t("footer.feedbackSending")}</>
+                  ) : (
+                    <><Send className="size-3" /> {t("footer.feedbackSend")}</>
+                  )}
+                </Button>
+              </div>
+            )}
           </footer>
         </main>
       </div>

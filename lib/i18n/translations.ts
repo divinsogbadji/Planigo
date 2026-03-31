@@ -136,7 +136,8 @@ export const translations = {
     "footer.feedbackSending": "Sending...",
     "footer.feedbackSuccess": "Thank you for your feedback!",
     "footer.feedbackError": "Failed to send feedback",
-    "footer.feedbackRequired": "Please enter your feedback",
+    "footer.feedbackRequired": "Please enter at least 3 characters",
+    "footer.feedbackInvalidEmail": "Invalid email address",
     // Language
     "lang.toggle": "Français",
   },
@@ -275,7 +276,8 @@ export const translations = {
     "footer.feedbackSending": "Envoi...",
     "footer.feedbackSuccess": "Merci pour votre retour !",
     "footer.feedbackError": "Échec de l'envoi",
-    "footer.feedbackRequired": "Veuillez saisir votre avis",
+    "footer.feedbackRequired": "Veuillez saisir au moins 3 caractères",
+    "footer.feedbackInvalidEmail": "Adresse email invalide",
     // Language
     "lang.toggle": "English",
   },

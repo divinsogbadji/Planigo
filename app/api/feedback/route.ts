@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import nodemailer from "nodemailer"
+
+const DEST_EMAIL = "noreply.planigoteams@gmail.com"
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,31 +11,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid feedback" }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const cleanMsg = message.trim().slice(0, 2000)
+    const userEmail = email?.trim() || "Anonyme"
 
-    // Use Supabase's admin auth to send an email via the configured SMTP
-    // We'll use the edge function or direct SMTP approach
-    // For simplicity, store feedback in a table and/or send via Supabase's built-in email
-    const { error } = await supabase.from("feedback").insert({
-      message: message.trim().slice(0, 2000),
-      email: email?.trim() || null,
-      created_at: new Date().toISOString(),
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || "smtp.gmail.com",
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER || DEST_EMAIL,
+        pass: process.env.SMTP_PASS,
+      },
     })
 
-    if (error) {
-      console.error("Feedback insert error:", error)
-      // If the table doesn't exist, still return success (graceful degradation)
-      if (error.code === "42P01") {
-        console.warn("Feedback table does not exist. Create it with: CREATE TABLE feedback (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, message text NOT NULL, email text, created_at timestamptz DEFAULT now());")
-        return NextResponse.json({ success: true, note: "stored" })
-      }
-      return NextResponse.json({ error: "Failed to save feedback" }, { status: 500 })
-    }
+    await transporter.sendMail({
+      from: `"Planigo Feedback" <${process.env.SMTP_USER || DEST_EMAIL}>`,
+      to: DEST_EMAIL,
+      subject: `[Planigo] Nouveau feedback de ${userEmail}`,
+      text: `De: ${userEmail}\n\n${cleanMsg}`,
+      html: `
+        <div style="font-family:sans-serif;max-width:480px">
+          <h3 style="color:#6366f1">📬 Nouveau feedback Planigo</h3>
+          <p><strong>De :</strong> ${userEmail}</p>
+          <hr style="border:none;border-top:1px solid #e5e7eb"/>
+          <p style="white-space:pre-wrap">${cleanMsg}</p>
+          <hr style="border:none;border-top:1px solid #e5e7eb"/>
+          <p style="font-size:12px;color:#9ca3af">Envoyé depuis Planigo</p>
+        </div>
+      `,
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Feedback error:", error)
-    return NextResponse.json({ error: "Server error" }, { status: 500 })
+    console.error("Feedback email error:", error)
+    return NextResponse.json({ error: "Failed to send feedback" }, { status: 500 })
   }
 }
 
