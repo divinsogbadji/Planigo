@@ -9,6 +9,7 @@ import { TaskForm } from "@/components/TaskForm"
 import { AISuggestDialog } from "@/components/AISuggestDialog"
 import { useToast } from "@/components/Toast"
 import { useTranslation } from "@/lib/i18n"
+import Link from "next/link"
 import { Archive, Send, Loader2, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -241,16 +242,24 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
 
           {/* Footer */}
           <footer className="mt-4 border-t border-white/5 py-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <p className="text-[10px] text-muted-foreground">{t("footer.copyright")}</p>
-              <button
-                type="button"
-                onClick={() => { setFeedbackOpen(!feedbackOpen); setFeedbackErrors({}) }}
-                className="flex items-center gap-1 text-[10px] text-muted-foreground transition-colors hover:text-white"
-              >
-                <MessageSquare className="size-3" />
-                {t("footer.feedbackTitle")}
-              </button>
+              <div className="flex items-center gap-3">
+                <Link href="/privacy" className="text-[10px] text-muted-foreground transition-colors hover:text-white">
+                  {t("footer.privacyLink")}
+                </Link>
+                <Link href="/faq" className="text-[10px] text-muted-foreground transition-colors hover:text-white">
+                  {t("footer.faqLink")}
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => { setFeedbackOpen(!feedbackOpen); setFeedbackErrors({}) }}
+                  className="flex items-center gap-1 text-[10px] text-muted-foreground transition-colors hover:text-white"
+                >
+                  <MessageSquare className="size-3" />
+                  {t("footer.feedbackTitle")}
+                </button>
+              </div>
             </div>
             {feedbackOpen && (
               <div className="mt-2 space-y-1.5 rounded-lg border border-white/10 bg-white/5 p-2.5 sm:max-w-xs sm:ml-auto">
