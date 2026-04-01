@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Sparkles, Loader2, Check, X } from "lucide-react"
+import { Sparkles, Loader2, Check, X, Calendar, Tag } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -155,10 +155,21 @@ export function AISuggestDialog({ open, onOpenChange, onConfirm }: AISuggestDial
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white">{task.title}</p>
                     {task.description && <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{task.description}</p>}
-                    <div className="mt-1.5 flex items-center gap-2">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
                       <Badge variant="outline" className={priorityColor[task.priority] ?? ""}>{task.priority}</Badge>
+                      {task.category && <Badge variant="outline" className="bg-indigo-500/15 text-indigo-400 border-indigo-500/20"><Tag className="size-2.5 mr-1" />{task.category}</Badge>}
                       {task.duration && <span className="text-[10px] text-muted-foreground">{task.duration}</span>}
                     </div>
+                    {(task.due_date || task.start_date) && (
+                      <div className="mt-1 flex items-center gap-1.5 text-[10px] text-emerald-400/80">
+                        <Calendar className="size-3" />
+                        {task.start_date && task.due_date
+                          ? `${new Date(task.start_date).toLocaleDateString(locale)} → ${new Date(task.due_date).toLocaleDateString(locale)}`
+                          : task.due_date
+                            ? new Date(task.due_date).toLocaleDateString(locale)
+                            : new Date(task.start_date!).toLocaleDateString(locale)}
+                      </div>
+                    )}
                   </div>
                 </button>
               ))}

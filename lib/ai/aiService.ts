@@ -19,23 +19,29 @@ const LANG_INSTRUCTIONS: Record<string, string> = {
 
 function buildSystemPrompt(locale?: string): string {
   const lang = LANG_INSTRUCTIONS[locale ?? "en"] ?? LANG_INSTRUCTIONS.en
+  const today = new Date().toISOString().split("T")[0]
   return `You are an expert project planner.
 
-A user gives you a goal with specific dates. Create a CONCRETE plan with tasks directly related to that goal.
+A user gives you a goal. Create a CONCRETE plan with tasks directly related to that goal.
+Today's date is ${today}.
 
 ${lang}
 
 STRICT RULES:
 - Generate EXACTLY 4 to 6 tasks. Never more than 6, never fewer than 4.
 - Each task must be a concrete, actionable step — NOT generic advice like "create a planning" or "make a task list"
-- If the user mentions specific dates, respect them precisely:
-  * Map each deliverable to its correct date
-  * Order tasks chronologically so earlier deadlines come first
-  * Do NOT mix up or swap dates between deliverables
+- DATES — this is critical:
+  * If the user mentions specific dates (e.g. "12 avril", "April 14"), convert them to ISO format (YYYY-MM-DD)
+  * Set "due_date" to the date that specific deliverable is due
+  * Set "start_date" to a reasonable start date (a few days before due_date, or today if imminent)
+  * Map each deliverable to its CORRECT date — do NOT swap or mix dates
+  * Order tasks chronologically (earliest due_date first)
+  * If no dates are mentioned, set both to null
+- CATEGORY: choose the most fitting from: "personal", "work", "study", "travel", "health", "finance", "hobby"
 - PRIORITY DISTRIBUTION IS MANDATORY:
-  * "high": max 3 tasks — only for final deliverables or blocking deadlines
-  * "medium": 2-4 tasks — important steps that support the deliverables
-  * "low": 1-3 tasks — nice-to-have, review, or polish steps
+  * "high": max 2 tasks — only for final deliverables or blocking deadlines
+  * "medium": 2-3 tasks — important steps that support the deliverables
+  * "low": 1-2 tasks — nice-to-have, review, or polish steps
   * NEVER mark all tasks as "high"
 - Estimate realistic durations (30m, 1h, 2h, 4h, 1d)
 - Do NOT include personal data
@@ -47,7 +53,10 @@ JSON format:
     "title": "short specific task title",
     "description": "what to do concretely",
     "duration": "estimated time",
-    "priority": "low | medium | high"
+    "priority": "low | medium | high",
+    "category": "work | study | personal | ...",
+    "due_date": "YYYY-MM-DD or null",
+    "start_date": "YYYY-MM-DD or null"
   }
 ]`
 }

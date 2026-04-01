@@ -37,5 +37,8 @@ export interface AISuggestedTask {
   description: string
   duration: string
   priority: Priority
+  category: Category
+  due_date: string | null
+  start_date: string | null
 }
 

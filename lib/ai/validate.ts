@@ -8,9 +8,20 @@ export interface ValidatedTask {
   description: string
   duration: string
   priority: "low" | "medium" | "high"
+  category: "personal" | "work" | "study" | "travel" | "health" | "finance" | "hobby"
+  due_date: string | null
+  start_date: string | null
 }
 
 const VALID_PRIORITIES = new Set(["low", "medium", "high"])
+const VALID_CATEGORIES = new Set(["personal", "work", "study", "travel", "health", "finance", "hobby"])
+
+/** Try to parse a date string into ISO-8601. Returns null if invalid. */
+function parseISODate(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim()) return null
+  const d = new Date(value.trim())
+  return isNaN(d.getTime()) ? null : d.toISOString()
+}
 
 /**
  * Parse raw AI text into a validated task array.
@@ -46,12 +57,17 @@ export function validateAIResponse(raw: string): ValidatedTask[] | null {
     const description = typeof item.description === "string" ? item.description.trim() : ""
     const duration = typeof item.duration === "string" ? item.duration.trim() : "1h"
     const priority = typeof item.priority === "string" && VALID_PRIORITIES.has(item.priority.toLowerCase())
-      ? (item.priority.toLowerCase() as "low" | "medium" | "high")
+      ? (item.priority.toLowerCase() as ValidatedTask["priority"])
       : "medium"
+    const category = typeof item.category === "string" && VALID_CATEGORIES.has(item.category.toLowerCase())
+      ? (item.category.toLowerCase() as ValidatedTask["category"])
+      : "personal"
+    const due_date = parseISODate(item.due_date)
+    const start_date = parseISODate(item.start_date)
 
     if (!title) continue // skip entries without a title
 
-    tasks.push({ title, description, duration, priority })
+    tasks.push({ title, description, duration, priority, category, due_date, start_date })
   }
 
   return tasks.length > 0 ? tasks : null

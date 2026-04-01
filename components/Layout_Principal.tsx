@@ -167,9 +167,10 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
       description: s.description,
       duration: s.duration,
       priority: s.priority,
-      category: "personal" as const,
+      category: s.category ?? ("personal" as const),
       status: "todo" as const,
-      due_date: null,
+      due_date: s.due_date ?? null,
+      start_date: s.start_date ?? null,
       user_id: userId,
     }))
     const { data: rows, error } = await supabase.from("tasks").insert(inserts).select()
