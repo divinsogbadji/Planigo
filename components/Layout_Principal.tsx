@@ -130,6 +130,21 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
     }
   }, [supabase, toast])
 
+  // ── Drag & drop status change ──
+  const handleStatusChange = useCallback(async (taskId: string, newStatus: string) => {
+    const { data: rows, error } = await supabase
+      .from("tasks")
+      .update({ status: newStatus })
+      .eq("id", taskId)
+      .select()
+    if (error) {
+      toast("error", t("toast.failedUpdate") + ": " + error.message)
+    } else if (rows?.[0]) {
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? rows[0] : t)))
+      toast("success", t("toast.taskUpdated"))
+    }
+  }, [supabase, toast, t])
+
   // ── Calendar reschedule (drag & drop) ──
   const handleReschedule = useCallback(async (taskId: string, newDate: string) => {
     const { data: rows, error } = await supabase
@@ -237,11 +252,12 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
             onDeleteTask={handleDelete}
             onArchiveTask={handleArchive}
             onRestoreTask={handleRestore}
+            onStatusChange={isArchiveView ? undefined : handleStatusChange}
             isArchiveView={isArchiveView}
           />
 
           {/* Footer */}
-          <footer className="mt-4 border-t border-white/5 py-3">
+          <footer className="mt-2 border-t border-white/5 py-1.5">
             <div className="flex items-center justify-between gap-3">
               <p className="text-[10px] text-muted-foreground">{t("footer.copyright")}</p>
               <div className="flex items-center gap-3">

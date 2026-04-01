@@ -40,6 +40,20 @@ export async function signup(formData: FormData) {
     redirect("/signup?error=" + encodeURIComponent(error.message))
   }
 
+  // Send welcome email (fire & forget — don't block signup on email failure)
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000"
+    fetch(`${baseUrl}/api/welcome-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: data.email }),
+    }).catch(() => {}) // silently ignore
+  } catch {
+    // ignore welcome email errors
+  }
+
   // In dev mode, if session is returned (email confirmation disabled in Supabase),
   // redirect straight to dashboard
   if (isDev && signUpData?.session) {

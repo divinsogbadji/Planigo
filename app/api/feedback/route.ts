@@ -14,13 +14,21 @@ export async function POST(req: NextRequest) {
     const cleanMsg = message.trim().slice(0, 2000)
     const userEmail = email?.trim() || "Anonyme"
 
+    // Check SMTP credentials are configured
+    const smtpPass = process.env.SMTP_PASS
+    if (!smtpPass || smtpPass === "your-gmail-app-password-here") {
+      console.warn("[Feedback] SMTP_PASS not configured — storing feedback in logs only")
+      console.log(`[Feedback] From: ${userEmail} | Message: ${cleanMsg}`)
+      return NextResponse.json({ success: true })
+    }
+
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || "smtp.gmail.com",
       port: Number(process.env.SMTP_PORT) || 587,
       secure: false,
       auth: {
         user: process.env.SMTP_USER || DEST_EMAIL,
-        pass: process.env.SMTP_PASS,
+        pass: smtpPass,
       },
     })
 

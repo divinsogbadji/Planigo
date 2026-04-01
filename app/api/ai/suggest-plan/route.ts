@@ -2,9 +2,10 @@
  * Copyright (c) - All Rights Reserved.
  * See the LICENSE file for more information.
  *
- * AI Task Planner — Dual provider with automatic fallback
+ * AI Task Planner — Triple provider with automatic fallback
  * Provider 1: Google Gemini (free tier)
- * Provider 2: OpenAI GPT-4o-mini (paid)
+ * Provider 2: Groq / Llama 3 (free tier)
+ * Provider 3: OpenAI GPT-4o-mini (paid)
  */
 
 import { NextRequest, NextResponse } from "next/server"
@@ -53,6 +54,35 @@ async function callGemini(prompt: string): Promise<string> {
   throw new Error("Gemini max retries exceeded")
 }
 
+// ─── Provider: Groq (Llama 3, free tier) ─────────────────────────
+async function callGroq(prompt: string): Promise<string> {
+  const key = process.env.GROQ_API_KEY
+  if (!key) throw new Error("GROQ_API_KEY not set")
+
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7,
+    }),
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Groq ${res.status}: ${err}`)
+  }
+
+  const data = await res.json()
+  const text = data.choices?.[0]?.message?.content
+  if (!text) throw new Error("Empty Groq response")
+  return text
+}
+
 // ─── Provider: OpenAI ───────────────────────────────────────────────
 async function callOpenAI(prompt: string): Promise<string> {
   const key = process.env.OPENAI_API_KEY
@@ -84,9 +114,10 @@ async function callOpenAI(prompt: string): Promise<string> {
 
 // ─── Fallback orchestrator ──────────────────────────────────────────
 async function callAI(prompt: string): Promise<{ content: string; provider: string }> {
-  // Try Gemini first (free), then OpenAI as fallback
+  // Try Gemini first (free), then Groq (free), then OpenAI as last resort
   const providers = [
     { name: "Gemini", fn: callGemini },
+    { name: "Groq", fn: callGroq },
     { name: "OpenAI", fn: callOpenAI },
   ]
 

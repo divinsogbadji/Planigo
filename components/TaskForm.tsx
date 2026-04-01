@@ -24,11 +24,14 @@ interface FieldErrors {
   duration?: string
 }
 
+type DateMode = "end_only" | "interval" | "with_duration"
+
 const defaultValues: TaskInsert = {
   title: "",
   description: "",
   category: "personal",
   status: "todo",
+  start_date: null,
   due_date: null,
   duration: null,
   priority: "medium",
@@ -40,6 +43,7 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
   const isEditing = !!task
   const { t } = useTranslation()
   const [form, setForm] = useState<TaskInsert>(defaultValues)
+  const [dateMode, setDateMode] = useState<DateMode>("end_only")
   const [errors, setErrors] = useState<FieldErrors>({})
   const [touched, setTouched] = useState<Set<string>>(new Set())
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
@@ -51,12 +55,22 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
         description: task.description ?? "",
         category: task.category ?? "personal",
         status: task.status ?? "todo",
+        start_date: task.start_date,
         due_date: task.due_date,
         duration: task.duration,
         priority: task.priority ?? "medium",
       })
+      // Detect date mode from existing data
+      if (task.start_date && task.due_date && task.duration) {
+        setDateMode("with_duration")
+      } else if (task.start_date && task.due_date) {
+        setDateMode("interval")
+      } else {
+        setDateMode("end_only")
+      }
     } else {
       setForm(defaultValues)
+      setDateMode("end_only")
     }
     setErrors({})
     setTouched(new Set())
@@ -225,23 +239,57 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
               </div>
             )}
 
+            {/* Date mode selector */}
+            <div className="space-y-2">
+              <Label>{t("form.dateMode")}</Label>
+              <Select value={dateMode} onValueChange={(v) => {
+                const mode = v as DateMode
+                setDateMode(mode)
+                if (mode === "end_only") {
+                  setForm((f) => ({ ...f, start_date: null, duration: null }))
+                } else if (mode === "interval") {
+                  setForm((f) => ({ ...f, duration: null }))
+                }
+              }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="end_only">{t("form.dateEndOnly")}</SelectItem>
+                  <SelectItem value="interval">{t("form.dateInterval")}</SelectItem>
+                  <SelectItem value="with_duration">{t("form.dateWithDuration")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
+              {/* Start date — shown for interval & with_duration */}
+              {(dateMode === "interval" || dateMode === "with_duration") && (
+                <div className="space-y-2">
+                  <Label htmlFor="start_date">{t("form.startDate")}</Label>
+                  <Input id="start_date" type="datetime-local" value={form.start_date ?? ""} onChange={(e) => handleChange("start_date", e.target.value || null)} />
+                </div>
+              )}
+
+              {/* End / due date — always shown */}
               <div className="space-y-2">
-                <Label htmlFor="due_date">{t("form.dueDate")}</Label>
+                <Label htmlFor="due_date">{dateMode === "end_only" ? t("form.dueDate") : t("form.endDate")}</Label>
                 <Input id="due_date" type="datetime-local" value={form.due_date ?? ""} onChange={(e) => handleChange("due_date", e.target.value || null)} />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="duration">{t("form.duration")}</Label>
-                <Input
-                  id="duration"
-                  placeholder={t("form.durationPlaceholder")}
-                  value={form.duration ?? ""}
-                  onChange={(e) => handleChange("duration", e.target.value || null)}
-                  onBlur={() => handleBlur("duration")}
-                  className={fieldClass("duration")}
-                />
-                {errors.duration && touched.has("duration") && <p className="text-xs text-red-400">{errors.duration}</p>}
-              </div>
+
+              {/* Duration — only for with_duration mode */}
+              {dateMode === "with_duration" && (
+                <div className="space-y-2">
+                  <Label htmlFor="duration">{t("form.duration")}</Label>
+                  <Input
+                    id="duration"
+                    placeholder={t("form.durationPlaceholder")}
+                    value={form.duration ?? ""}
+                    onChange={(e) => handleChange("duration", e.target.value || null)}
+                    onBlur={() => handleBlur("duration")}
+                    className={fieldClass("duration")}
+                  />
+                  {errors.duration && touched.has("duration") && <p className="text-xs text-red-400">{errors.duration}</p>}
+                </div>
+              )}
             </div>
 
             <DialogFooter>

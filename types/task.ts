@@ -17,7 +17,8 @@ export interface Task {
   description: string | null
   category: Category
   status: Status
-  due_date: string | null      // ISO-8601 timestamp
+  start_date: string | null    // ISO-8601 timestamp (optional start)
+  due_date: string | null      // ISO-8601 timestamp (end / deadline)
   duration: string | null
   priority: Priority
   is_archived: boolean         // true = archived (hidden from main view)
