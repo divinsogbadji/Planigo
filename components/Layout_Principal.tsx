@@ -161,15 +161,18 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
   }, [supabase, toast])
 
   // ── AI bulk insert ──
+  const SAFE_CATEGORIES = new Set(["personal", "work", "study", "travel", "health", "finance", "hobby"])
+  const SAFE_PRIORITIES = new Set(["low", "medium", "high"])
+
   const handleAIConfirm = useCallback(async (suggested: AISuggestedTask[]) => {
-    // Build insert objects — only include date fields when they have a value
+    // Build insert objects — sanitise category/priority to avoid CHECK constraint violations
     const inserts = suggested.map((s) => {
       const row: Record<string, unknown> = {
         title: s.title,
         description: s.description,
         duration: s.duration,
-        priority: s.priority,
-        category: s.category ?? "personal",
+        priority: SAFE_PRIORITIES.has(s.priority) ? s.priority : "medium",
+        category: SAFE_CATEGORIES.has(s.category) ? s.category : "personal",
         status: "todo",
         user_id: userId,
       }
@@ -178,11 +181,19 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
       return row
     })
 
-    // Try inserting with dates; if 400 (column missing), retry without date fields
+    // First attempt
     let { data: rows, error } = await supabase.from("tasks").insert(inserts).select()
-    if (error?.code === "PGRST204" || error?.message?.includes("start_date")) {
-      const fallback = inserts.map(({ start_date, ...rest }) => rest)
-      ;({ data: rows, error } = await supabase.from("tasks").insert(fallback).select())
+
+    // If category constraint fails → retry with "personal"
+    if (error?.message?.includes("category_check")) {
+      const safe = inserts.map((r) => ({ ...r, category: "personal" }))
+      ;({ data: rows, error } = await supabase.from("tasks").insert(safe).select())
+    }
+
+    // If start_date column missing → retry without it
+    if (error?.message?.includes("start_date")) {
+      const safe = inserts.map(({ start_date, ...rest }) => ({ ...rest, category: "personal" }))
+      ;({ data: rows, error } = await supabase.from("tasks").insert(safe).select())
     }
 
     if (error) {
