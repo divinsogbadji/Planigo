@@ -32,26 +32,32 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    await transporter.sendMail({
-      from: `"Planigo Feedback" <${process.env.SMTP_USER || DEST_EMAIL}>`,
-      to: DEST_EMAIL,
-      subject: `[Planigo] Nouveau feedback de ${userEmail}`,
-      text: `De: ${userEmail}\n\n${cleanMsg}`,
-      html: `
-        <div style="font-family:sans-serif;max-width:480px">
-          <h3 style="color:#6366f1">📬 Nouveau feedback Planigo</h3>
-          <p><strong>De :</strong> ${userEmail}</p>
-          <hr style="border:none;border-top:1px solid #e5e7eb"/>
-          <p style="white-space:pre-wrap">${cleanMsg}</p>
-          <hr style="border:none;border-top:1px solid #e5e7eb"/>
-          <p style="font-size:12px;color:#9ca3af">Envoyé depuis Planigo</p>
-        </div>
-      `,
-    })
+    try {
+      await transporter.sendMail({
+        from: `"Planigo Feedback" <${process.env.SMTP_USER || DEST_EMAIL}>`,
+        to: DEST_EMAIL,
+        subject: `[Planigo] Nouveau feedback de ${userEmail}`,
+        text: `De: ${userEmail}\n\n${cleanMsg}`,
+        html: `
+          <div style="font-family:sans-serif;max-width:480px">
+            <h3 style="color:#6366f1">📬 Nouveau feedback Planigo</h3>
+            <p><strong>De :</strong> ${userEmail}</p>
+            <hr style="border:none;border-top:1px solid #e5e7eb"/>
+            <p style="white-space:pre-wrap">${cleanMsg}</p>
+            <hr style="border:none;border-top:1px solid #e5e7eb"/>
+            <p style="font-size:12px;color:#9ca3af">Envoyé depuis Planigo</p>
+          </div>
+        `,
+      })
+    } catch (smtpErr) {
+      console.error("[Feedback] SMTP send failed:", smtpErr)
+      console.log(`[Feedback] Saved to logs — From: ${userEmail} | Message: ${cleanMsg}`)
+      // Still return success to the user — feedback is logged
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Feedback email error:", error)
+    console.error("Feedback error:", error)
     return NextResponse.json({ error: "Failed to send feedback" }, { status: 500 })
   }
 }
