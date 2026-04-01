@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { Sidebar, type NavItem, type CategoryFilter } from "@/components/Sidebar"
+import { Sidebar, type NavItem, type CategoryFilter, type PriorityFilter } from "@/components/Sidebar"
 import { Topbar } from "@/components/topbar"
 import { CalendarView } from "@/components/CalendarView"
 import { TaskList } from "@/components/TaskList"
@@ -32,6 +32,7 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
   const [aiDialogOpen, setAiDialogOpen] = useState(false)
   const [activeNav, setActiveNav] = useState<NavItem>("all")
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>("all")
+  const [activePriority, setActivePriority] = useState<PriorityFilter>("all")
   const [feedbackMsg, setFeedbackMsg] = useState("")
   const [feedbackEmail, setFeedbackEmail] = useState("")
   const [feedbackSending, setFeedbackSending] = useState(false)
@@ -48,6 +49,7 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
     if (t.is_archived) return false
 
     if (activeCategory !== "all" && t.category !== activeCategory) return false
+    if (activePriority !== "all" && t.priority !== activePriority) return false
     if (activeNav === "today") {
       if (!t.due_date) return false
       return new Date(t.due_date).toDateString() === new Date().toDateString()
@@ -165,6 +167,13 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
   const SAFE_PRIORITIES = new Set(["low", "medium", "high"])
 
   const handleAIConfirm = useCallback(async (suggested: AISuggestedTask[]) => {
+    // Verify session is still valid — prevents RLS violations from expired tokens
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      toast("error", t("toast.failedAI") + ": " + t("toast.sessionExpired"))
+      return
+    }
+
     // Build insert objects — sanitise category/priority to avoid CHECK constraint violations
     const inserts = suggested.map((s) => {
       const row: Record<string, unknown> = {
@@ -174,7 +183,7 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
         priority: SAFE_PRIORITIES.has(s.priority) ? s.priority : "medium",
         category: SAFE_CATEGORIES.has(s.category) ? s.category : "personal",
         status: "todo",
-        user_id: userId,
+        user_id: user.id,
       }
       if (s.due_date) row.due_date = s.due_date
       if (s.start_date) row.start_date = s.start_date
@@ -184,15 +193,15 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
     // First attempt
     let { data: rows, error } = await supabase.from("tasks").insert(inserts).select()
 
-    // If category constraint fails → retry with "personal"
-    if (error?.message?.includes("category_check")) {
-      const safe = inserts.map((r) => ({ ...r, category: "personal" }))
+    // If start_date column missing → retry without it
+    if (error?.message?.includes("start_date")) {
+      const safe = inserts.map(({ start_date, ...rest }) => rest)
       ;({ data: rows, error } = await supabase.from("tasks").insert(safe).select())
     }
 
-    // If start_date column missing → retry without it
-    if (error?.message?.includes("start_date")) {
-      const safe = inserts.map(({ start_date, ...rest }) => ({ ...rest, category: "personal" }))
+    // If category constraint fails → retry with "personal"
+    if (error?.message?.includes("category_check")) {
+      const safe = inserts.map((r) => ({ ...r, category: "personal" }))
       ;({ data: rows, error } = await supabase.from("tasks").insert(safe).select())
     }
 
@@ -253,8 +262,10 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
       <Sidebar
         activeNav={activeNav}
         activeCategory={activeCategory}
+        activePriority={activePriority}
         onNavChange={setActiveNav}
         onCategoryChange={setActiveCategory}
+        onPriorityChange={setActivePriority}
       />
 
       <div className="flex flex-1 flex-col overflow-hidden">

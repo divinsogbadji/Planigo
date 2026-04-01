@@ -133,6 +133,10 @@ export const translations = {
     "toast.failedRestore": "Failed to restore task",
     "toast.failedReschedule": "Failed to reschedule task",
     "toast.failedAI": "Failed to add AI tasks",
+    "toast.sessionExpired": "Session expired — please sign in again",
+    // Priority filter
+    "nav.priorities": "Priorities",
+    "priority.all": "All",
     // Footer
     "footer.copyright": "© 2025 @skid | MIT License",
     "footer.feedbackTitle": "Feedback & Suggestions",
@@ -296,6 +300,10 @@ export const translations = {
     "toast.failedRestore": "Échec de la restauration",
     "toast.failedReschedule": "Échec de la replanification",
     "toast.failedAI": "Échec de l'ajout IA",
+    "toast.sessionExpired": "Session expirée — veuillez vous reconnecter",
+    // Priority filter
+    "nav.priorities": "Priorités",
+    "priority.all": "Toutes",
     // Footer
     "footer.copyright": "© 2025 @skid | Licence MIT",
     "footer.feedbackTitle": "Avis & Suggestions",
