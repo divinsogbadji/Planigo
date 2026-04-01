@@ -156,8 +156,8 @@ export function AISuggestDialog({ open, onOpenChange, onConfirm }: AISuggestDial
                     <p className="text-sm font-medium text-white">{task.title}</p>
                     {task.description && <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{task.description}</p>}
                     <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className={priorityColor[task.priority] ?? ""}>{task.priority}</Badge>
-                      {task.category && <Badge variant="outline" className="bg-indigo-500/15 text-indigo-400 border-indigo-500/20"><Tag className="size-2.5 mr-1" />{task.category}</Badge>}
+                      <Badge variant="outline" className={priorityColor[task.priority] ?? ""}>{t(`priority.${task.priority}` as "priority.low" | "priority.medium" | "priority.high")}</Badge>
+                      {task.category && <Badge variant="outline" className="bg-indigo-500/15 text-indigo-400 border-indigo-500/20"><Tag className="size-2.5 mr-1" />{t(`cat.${task.category}` as "cat.personal" | "cat.work" | "cat.study" | "cat.travel" | "cat.health" | "cat.finance" | "cat.hobby")}</Badge>}
                       {task.duration && <span className="text-[10px] text-muted-foreground">{task.duration}</span>}
                     </div>
                     {(task.due_date || task.start_date) && (
