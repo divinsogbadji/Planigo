@@ -33,9 +33,9 @@ STRICT RULES:
   * Order tasks chronologically so earlier deadlines come first
   * Do NOT mix up or swap dates between deliverables
 - PRIORITY DISTRIBUTION IS MANDATORY:
-  * "high": max 2 tasks — only for final deliverables or blocking deadlines
-  * "medium": 2-3 tasks — important steps that support the deliverables
-  * "low": 1-2 tasks — nice-to-have, review, or polish steps
+  * "high": max 3 tasks — only for final deliverables or blocking deadlines
+  * "medium": 2-4 tasks — important steps that support the deliverables
+  * "low": 1-3 tasks — nice-to-have, review, or polish steps
   * NEVER mark all tasks as "high"
 - Estimate realistic durations (30m, 1h, 2h, 4h, 1d)
 - Do NOT include personal data
