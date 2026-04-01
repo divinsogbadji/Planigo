@@ -162,18 +162,29 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
 
   // ── AI bulk insert ──
   const handleAIConfirm = useCallback(async (suggested: AISuggestedTask[]) => {
-    const inserts = suggested.map((s) => ({
-      title: s.title,
-      description: s.description,
-      duration: s.duration,
-      priority: s.priority,
-      category: s.category ?? ("personal" as const),
-      status: "todo" as const,
-      due_date: s.due_date ?? null,
-      start_date: s.start_date ?? null,
-      user_id: userId,
-    }))
-    const { data: rows, error } = await supabase.from("tasks").insert(inserts).select()
+    // Build insert objects — only include date fields when they have a value
+    const inserts = suggested.map((s) => {
+      const row: Record<string, unknown> = {
+        title: s.title,
+        description: s.description,
+        duration: s.duration,
+        priority: s.priority,
+        category: s.category ?? "personal",
+        status: "todo",
+        user_id: userId,
+      }
+      if (s.due_date) row.due_date = s.due_date
+      if (s.start_date) row.start_date = s.start_date
+      return row
+    })
+
+    // Try inserting with dates; if 400 (column missing), retry without date fields
+    let { data: rows, error } = await supabase.from("tasks").insert(inserts).select()
+    if (error?.code === "PGRST204" || error?.message?.includes("start_date")) {
+      const fallback = inserts.map(({ start_date, ...rest }) => rest)
+      ;({ data: rows, error } = await supabase.from("tasks").insert(fallback).select())
+    }
+
     if (error) {
       toast("error", t("toast.failedAI") + ": " + error.message)
     } else if (rows) {

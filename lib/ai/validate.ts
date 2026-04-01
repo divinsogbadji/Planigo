@@ -16,11 +16,13 @@ export interface ValidatedTask {
 const VALID_PRIORITIES = new Set(["low", "medium", "high"])
 const VALID_CATEGORIES = new Set(["personal", "work", "study", "travel", "health", "finance", "hobby"])
 
-/** Try to parse a date string into ISO-8601. Returns null if invalid. */
+/** Try to parse a date string into YYYY-MM-DD format. Returns null if invalid. */
 function parseISODate(value: unknown): string | null {
   if (typeof value !== "string" || !value.trim()) return null
   const d = new Date(value.trim())
-  return isNaN(d.getTime()) ? null : d.toISOString()
+  if (isNaN(d.getTime())) return null
+  // Return YYYY-MM-DD only — Supabase DATE/TIMESTAMPTZ columns accept this cleanly
+  return d.toISOString().split("T")[0]
 }
 
 /**
