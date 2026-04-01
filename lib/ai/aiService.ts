@@ -1,0 +1,89 @@
+/**
+ * AI Service — orchestrates providers, validation, fallback.
+ * Flow: sanitize → try providers in order → validate → fallback if needed.
+ * © 2025 @skid | MIT License
+ */
+
+import { sanitizeGoal, sanitizeDeadline } from "./sanitize"
+import { validateAIResponse, type ValidatedTask } from "./validate"
+import { getFallbackPlan } from "./fallback"
+import * as openrouter from "./providers/openrouter"
+import * as gemini from "./providers/gemini"
+import * as ollama from "./providers/ollama"
+
+// ─── System prompt ──────────────────────────────────────────────────
+const SYSTEM_PROMPT = `You are a productivity assistant.
+
+Convert the user goal into a list of actionable tasks.
+
+Rules:
+- break into small steps
+- include a short description
+- estimate duration
+- assign priority (low, medium, high)
+- do NOT include personal data
+- return ONLY JSON
+
+Format:
+[
+  {
+    "title": "",
+    "description": "",
+    "duration": "",
+    "priority": ""
+  }
+]`
+
+// ─── Provider registry (order = priority) ───────────────────────────
+interface Provider {
+  name: string
+  fn: (prompt: string) => Promise<string>
+}
+
+const providers: Provider[] = [
+  { name: "OpenRouter", fn: openrouter.generateTasks },
+  { name: "Gemini",     fn: gemini.generateTasks },
+  { name: "Ollama",     fn: ollama.generateTasks },
+]
+
+// ─── Main entry point ───────────────────────────────────────────────
+export interface AIResult {
+  tasks: ValidatedTask[]
+  provider: string
+  isFallback: boolean
+}
+
+export async function generatePlan(rawGoal: string, rawDeadline?: string): Promise<AIResult> {
+  const goal = sanitizeGoal(rawGoal)
+  const deadline = sanitizeDeadline(rawDeadline)
+
+  if (!goal || goal.length < 2) {
+    return { tasks: getFallbackPlan(rawGoal), provider: "fallback", isFallback: true }
+  }
+
+  const prompt = `${SYSTEM_PROMPT}\n\nGoal: ${goal}\nDeadline: ${deadline}`
+
+  // Try each provider in order
+  for (const { name, fn } of providers) {
+    try {
+      console.log(`[AI] Trying ${name}...`)
+      const raw = await fn(prompt)
+      console.log(`[AI] ✓ ${name} responded`)
+
+      const tasks = validateAIResponse(raw)
+      if (tasks) {
+        console.log(`[AI] ✓ Validated ${tasks.length} tasks from ${name}`)
+        return { tasks, provider: name, isFallback: false }
+      }
+
+      console.warn(`[AI] ✗ ${name} returned invalid structure, trying next...`)
+    } catch (err) {
+      console.warn(`[AI] ✗ ${name} failed:`, (err as Error).message)
+    }
+  }
+
+  // All providers failed → return static fallback
+  console.warn("[AI] All providers failed — using fallback plan")
+  return { tasks: getFallbackPlan(goal), provider: "fallback", isFallback: true }
+}
+
