@@ -18,7 +18,7 @@ interface AISuggestDialogProps {
 }
 
 export function AISuggestDialog({ open, onOpenChange, onConfirm }: AISuggestDialogProps) {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const [goal, setGoal] = useState("")
   const [deadline, setDeadline] = useState("")
   const [loading, setLoading] = useState(false)
@@ -50,7 +50,7 @@ export function AISuggestDialog({ open, onOpenChange, onConfirm }: AISuggestDial
       const res = await fetch("/api/ai/suggest-plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goal: goal.trim(), deadline: deadline || undefined }),
+        body: JSON.stringify({ goal: goal.trim(), deadline: deadline || undefined, locale }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to generate suggestions")

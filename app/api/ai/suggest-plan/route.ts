@@ -12,13 +12,13 @@ import { generatePlan } from "@/lib/ai/aiService"
 // ─── Route handler ──────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
-    const { goal, deadline } = await req.json()
+    const { goal, deadline, locale } = await req.json()
 
     if (!goal || typeof goal !== "string" || goal.trim().length < 2) {
       return NextResponse.json({ error: "Missing or invalid goal" }, { status: 400 })
     }
 
-    const result = await generatePlan(goal, deadline)
+    const result = await generatePlan(goal, deadline, locale)
 
     return NextResponse.json({
       tasks: result.tasks,

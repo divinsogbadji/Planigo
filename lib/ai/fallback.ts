@@ -5,8 +5,8 @@
 
 import type { ValidatedTask } from "./validate"
 
-export function getFallbackPlan(goal: string): ValidatedTask[] {
-  return [
+const fallbacks: Record<string, (goal: string) => ValidatedTask[]> = {
+  en: (goal) => [
     {
       title: "Define the objective clearly",
       description: `Understand the goal: "${goal.slice(0, 80)}${goal.length > 80 ? "..." : ""}"`,
@@ -37,6 +37,43 @@ export function getFallbackPlan(goal: string): ValidatedTask[] {
       duration: "30m",
       priority: "low",
     },
-  ]
+  ],
+  fr: (goal) => [
+    {
+      title: "Définir l'objectif clairement",
+      description: `Comprendre l'objectif : « ${goal.slice(0, 80)}${goal.length > 80 ? "…" : ""} »`,
+      duration: "30m",
+      priority: "high",
+    },
+    {
+      title: "Découper en étapes",
+      description: "Diviser l'objectif en sous-tâches réalisables",
+      duration: "1h",
+      priority: "medium",
+    },
+    {
+      title: "Rassembler les ressources nécessaires",
+      description: "Identifier les outils, documents ou personnes nécessaires",
+      duration: "30m",
+      priority: "medium",
+    },
+    {
+      title: "Exécuter la première étape",
+      description: "Commencer par l'action la plus impactante",
+      duration: "2h",
+      priority: "high",
+    },
+    {
+      title: "Réviser et ajuster",
+      description: "Évaluer la progression et affiner le plan",
+      duration: "30m",
+      priority: "low",
+    },
+  ],
+}
+
+export function getFallbackPlan(goal: string, locale?: string): ValidatedTask[] {
+  const fn = fallbacks[locale ?? "en"] ?? fallbacks.en
+  return fn(goal)
 }
 

@@ -11,10 +11,19 @@ import * as openrouter from "./providers/openrouter"
 import * as gemini from "./providers/gemini"
 import * as ollama from "./providers/ollama"
 
-// ─── System prompt ──────────────────────────────────────────────────
-const SYSTEM_PROMPT = `You are a productivity assistant.
+// ─── System prompt builder ──────────────────────────────────────────
+const LANG_INSTRUCTIONS: Record<string, string> = {
+  fr: "IMPORTANT: Réponds ENTIÈREMENT en français. Tous les titres, descriptions et contenus doivent être en français.",
+  en: "IMPORTANT: Respond ENTIRELY in English. All titles, descriptions and content must be in English.",
+}
+
+function buildSystemPrompt(locale?: string): string {
+  const lang = LANG_INSTRUCTIONS[locale ?? "en"] ?? LANG_INSTRUCTIONS.en
+  return `You are a productivity assistant.
 
 Convert the user goal into a list of actionable tasks.
+
+${lang}
 
 Rules:
 - break into small steps
@@ -33,6 +42,7 @@ Format:
     "priority": ""
   }
 ]`
+}
 
 // ─── Provider registry (order = priority) ───────────────────────────
 interface Provider {
@@ -53,15 +63,15 @@ export interface AIResult {
   isFallback: boolean
 }
 
-export async function generatePlan(rawGoal: string, rawDeadline?: string): Promise<AIResult> {
+export async function generatePlan(rawGoal: string, rawDeadline?: string, locale?: string): Promise<AIResult> {
   const goal = sanitizeGoal(rawGoal)
   const deadline = sanitizeDeadline(rawDeadline)
 
   if (!goal || goal.length < 2) {
-    return { tasks: getFallbackPlan(rawGoal), provider: "fallback", isFallback: true }
+    return { tasks: getFallbackPlan(rawGoal, locale), provider: "fallback", isFallback: true }
   }
 
-  const prompt = `${SYSTEM_PROMPT}\n\nGoal: ${goal}\nDeadline: ${deadline}`
+  const prompt = `${buildSystemPrompt(locale)}\n\nGoal: ${goal}\nDeadline: ${deadline}`
 
   // Try each provider in order
   for (const { name, fn } of providers) {
@@ -84,6 +94,6 @@ export async function generatePlan(rawGoal: string, rawDeadline?: string): Promi
 
   // All providers failed → return static fallback
   console.warn("[AI] All providers failed — using fallback plan")
-  return { tasks: getFallbackPlan(goal), provider: "fallback", isFallback: true }
+  return { tasks: getFallbackPlan(goal, locale), provider: "fallback", isFallback: true }
 }
 
