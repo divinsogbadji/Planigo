@@ -24,6 +24,8 @@ export async function POST(req: NextRequest) {
       tasks: result.tasks,
       provider: result.provider,
       isFallback: result.isFallback,
+      group_title_fr: result.group_title_fr,
+      group_title_en: result.group_title_en,
     })
   } catch (error) {
     console.error("[AI] Server error:", error)

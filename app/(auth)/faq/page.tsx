@@ -4,7 +4,7 @@ import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
-import { useTranslation } from "@/lib/i18n"
+import { useTranslation, type TranslationKey } from "@/lib/i18n"
 
 const FAQ_KEYS = ["q1", "q2", "q3", "q4", "q5", "q6"] as const
 
@@ -29,10 +29,10 @@ export default function FAQPage() {
               className="group rounded-lg border border-white/10 bg-white/5 p-3"
             >
               <summary className="cursor-pointer text-sm font-medium text-foreground">
-                {t(`faq.${key}` as any)}
+                {t(`faq.${key}` as TranslationKey)}
               </summary>
               <p className="mt-2 text-sm text-muted-foreground">
-                {t(`faq.a${key.slice(1)}` as any)}
+                {t(`faq.a${key.slice(1)}` as TranslationKey)}
               </p>
             </details>
           ))}

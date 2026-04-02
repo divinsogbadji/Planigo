@@ -12,11 +12,16 @@ import { AlertTriangle, CheckCircle2, Mail, Loader2 } from "lucide-react"
 import { useTranslation } from "@/lib/i18n"
 
 interface FieldErrors {
+  firstName?: string
+  lastName?: string
   email?: string
   password?: string
   confirmPassword?: string
   consent?: string
+  consentComms?: string
 }
+
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[@$!%*?&])[A-Za-z0-9@$!%*?&]{8,}$/
 
 export default function SignupPage() {
   return (
@@ -35,12 +40,18 @@ function SignupForm() {
   const [errors, setErrors] = useState<FieldErrors>({})
   const [submitting, setSubmitting] = useState(false)
   const [consentChecked, setConsentChecked] = useState(false)
+  const [consentCommsChecked, setConsentCommsChecked] = useState(false)
 
   function validate(formData: FormData): FieldErrors {
     const errs: FieldErrors = {}
+    const firstName = (formData.get("firstName") as string)?.trim()
+    const lastName = (formData.get("lastName") as string)?.trim()
     const email = (formData.get("email") as string)?.trim()
     const password = (formData.get("password") as string) ?? ""
     const confirmPassword = (formData.get("confirmPassword") as string) ?? ""
+
+    if (!firstName) errs.firstName = t("signup.firstNameRequired")
+    if (!lastName) errs.lastName = t("signup.lastNameRequired")
 
     if (!email) {
       errs.email = t("login.emailRequired")
@@ -50,8 +61,8 @@ function SignupForm() {
 
     if (!password) {
       errs.password = t("login.passwordRequired")
-    } else if (password.length < 6) {
-      errs.password = t("login.passwordMin")
+    } else if (!PASSWORD_REGEX.test(password)) {
+      errs.password = t("password.tooWeak")
     }
 
     if (!confirmPassword) {
@@ -62,6 +73,10 @@ function SignupForm() {
 
     if (!consentChecked) {
       errs.consent = t("signup.consentRequired")
+    }
+
+    if (!consentCommsChecked) {
+      errs.consentComms = t("signup.consentCommsRequired")
     }
 
     return errs
@@ -117,6 +132,19 @@ function SignupForm() {
           )}
 
           <form action={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">{t("signup.firstName")}</Label>
+                <Input id="firstName" name="firstName" type="text" placeholder="John" aria-invalid={!!errors.firstName} className={fieldClass(errors.firstName)} />
+                {errors.firstName && <p className="text-xs text-red-400">{errors.firstName}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">{t("signup.lastName")}</Label>
+                <Input id="lastName" name="lastName" type="text" placeholder="Doe" aria-invalid={!!errors.lastName} className={fieldClass(errors.lastName)} />
+                {errors.lastName && <p className="text-xs text-red-400">{errors.lastName}</p>}
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="email">{t("login.email")}</Label>
               <Input id="email" name="email" type="email" placeholder="you@example.com" aria-invalid={!!errors.email} className={fieldClass(errors.email)} />
@@ -127,6 +155,13 @@ function SignupForm() {
               <Label htmlFor="password">{t("login.password")}</Label>
               <Input id="password" name="password" type="password" placeholder="••••••••" aria-invalid={!!errors.password} className={fieldClass(errors.password)} />
               {errors.password && <p className="text-xs text-red-400">{errors.password}</p>}
+              <ul className="space-y-0.5 text-[11px] text-muted-foreground">
+                <li>• {t("password.minLength")}</li>
+                <li>• {t("password.uppercase")}</li>
+                <li>• {t("password.lowercase")}</li>
+                <li>• {t("password.digit")}</li>
+                <li>• {t("password.special")}</li>
+              </ul>
             </div>
 
             <div className="space-y-2">
@@ -152,6 +187,21 @@ function SignupForm() {
                 </span>
               </label>
               {errors.consent && <p className="text-xs text-red-400">{errors.consent}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={consentCommsChecked}
+                  onChange={(e) => setConsentCommsChecked(e.target.checked)}
+                  className="mt-1 size-4 rounded border-white/20 bg-white/5 accent-purple-500"
+                />
+                <span className="text-xs text-muted-foreground">
+                  {t("signup.consentComms")}
+                </span>
+              </label>
+              {errors.consentComms && <p className="text-xs text-red-400">{errors.consentComms}</p>}
             </div>
 
             <Button type="submit" className="w-full" disabled={submitting}>

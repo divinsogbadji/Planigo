@@ -29,9 +29,12 @@ interface TaskCardProps {
   onArchive?: (taskId: string) => void
   onRestore?: (taskId: string) => void
   isArchiveView?: boolean
+  selectable?: boolean
+  selected?: boolean
+  onToggleSelect?: (taskId: string) => void
 }
 
-export function TaskCard({ task, onEdit, onDelete, onArchive, onRestore, isArchiveView }: TaskCardProps) {
+export function TaskCard({ task, onEdit, onDelete, onArchive, onRestore, isArchiveView, selectable, selected, onToggleSelect }: TaskCardProps) {
   const { t, locale } = useTranslation()
   const dateFmt = (d: string) => new Date(d).toLocaleDateString(locale === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric" })
   const dueLabel = task.start_date && task.due_date
@@ -39,6 +42,10 @@ export function TaskCard({ task, onEdit, onDelete, onArchive, onRestore, isArchi
     : task.due_date
       ? dateFmt(task.due_date)
       : null
+
+  // Bilingual: pick the right title/description for the current locale
+  const displayTitle = (locale === "fr" ? task.title_fr : task.title_en) || task.title
+  const displayDescription = (locale === "fr" ? task.description_fr : task.description_en) || task.description
 
   const categoryKey = `cat.${task.category}` as "cat.personal" | "cat.work" | "cat.study" | "cat.travel" | "cat.health" | "cat.finance" | "cat.hobby"
   const priorityKey = `priority.${task.priority}` as "priority.low" | "priority.medium" | "priority.high"
@@ -54,10 +61,17 @@ export function TaskCard({ task, onEdit, onDelete, onArchive, onRestore, isArchi
       onDragEnd={(e) => {
         ;(e.currentTarget as HTMLElement).style.opacity = "1"
       }}
-      className="glass-card group animate-fade-up cursor-grab rounded-xl p-4 shadow-3d transition-all duration-200 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-3d-lg active:cursor-grabbing">
+      className={`glass-card group animate-fade-up rounded-xl p-4 shadow-3d transition-all duration-200 hover:-translate-y-1 hover:scale-[1.02] hover:shadow-3d-lg ${selectable ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"} ${selected ? "ring-2 ring-purple-500/60 bg-purple-500/10" : ""}`}
+      onClick={selectable ? () => onToggleSelect?.(task.id) : undefined}
+    >
       {/* Header: title + actions */}
       <div className="mb-2 flex items-start justify-between gap-2">
-        <h3 className="text-sm font-semibold text-white leading-snug">{task.title}</h3>
+        {selectable && (
+          <span className={`mt-0.5 mr-1 flex size-4 shrink-0 items-center justify-center rounded border transition-colors ${selected ? "border-purple-500 bg-purple-500" : "border-white/20 bg-white/5"}`}>
+            {selected && <span className="text-[10px] text-white">✓</span>}
+          </span>
+        )}
+        <h3 className="text-sm font-semibold text-white leading-snug flex-1">{displayTitle}</h3>
         <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
           {isArchiveView ? (
             <>
@@ -85,8 +99,8 @@ export function TaskCard({ task, onEdit, onDelete, onArchive, onRestore, isArchi
       </div>
 
       {/* Description */}
-      {task.description && (
-        <p className="mb-3 line-clamp-2 text-xs text-muted-foreground">{task.description}</p>
+      {displayDescription && (
+        <p className="mb-3 line-clamp-2 text-xs text-muted-foreground">{displayDescription}</p>
       )}
 
       {/* Footer: badges + meta */}

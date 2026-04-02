@@ -10,12 +10,12 @@ import { AISuggestDialog } from "@/components/AISuggestDialog"
 import { useToast } from "@/components/Toast"
 import { useTranslation } from "@/lib/i18n"
 import Link from "next/link"
-import { Archive, Send, Loader2, MessageSquare } from "lucide-react"
+import { Archive, Send, Loader2, MessageSquare, ChevronDown, X, Sparkles, CheckSquare, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { createClient } from "@/lib/supabase/client"
-import type { Task, TaskInsert, AISuggestedTask } from "@/types/task"
+import type { Task, TaskInsert, AISuggestedTask, TaskGroup } from "@/types/task"
 
 interface DashboardProps {
   initialTasks: Task[]
@@ -25,7 +25,7 @@ interface DashboardProps {
 export default function Dashboard({ initialTasks, userId }: DashboardProps) {
   const supabase = createClient()
   const { toast } = useToast()
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [formOpen, setFormOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
@@ -38,6 +38,11 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
   const [feedbackSending, setFeedbackSending] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [feedbackErrors, setFeedbackErrors] = useState<{ message?: string; email?: string }>({})
+  const [groups, setGroups] = useState<TaskGroup[]>([])
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState("")
 
   const isArchiveView = activeNav === "archived"
 
@@ -68,17 +73,57 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
   // ── CRUD handlers ──
   const handleCreate = useCallback(async (data: TaskInsert | (TaskInsert & { id: string })) => {
     if ("id" in data) return handleUpdate(data)
+
+    // Set bilingual fields based on current locale
+    const insertData: Record<string, unknown> = { ...data, user_id: userId }
+    if (locale === "fr") {
+      insertData.title_fr = data.title
+      insertData.description_fr = data.description || null
+    } else {
+      insertData.title_en = data.title
+      insertData.description_en = data.description || null
+    }
+
     const { data: rows, error } = await supabase
       .from("tasks")
-      .insert({ ...data, user_id: userId })
+      .insert(insertData)
       .select()
     if (error) {
       toast("error", t("toast.failedCreate") + ": " + error.message)
     } else if (rows) {
       setTasks((prev) => [...prev, ...rows])
       toast("success", t("toast.taskCreated"))
+
+      // Async translation — don't block the UI
+      const task = rows[0]
+      fetch("/api/ai/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: data.title, description: data.description || "", locale }),
+      })
+        .then((res) => res.json())
+        .then(async (translated) => {
+          if (!translated.title) return
+          const updateFields: Record<string, string> = {}
+          if (locale === "fr") {
+            updateFields.title_en = translated.title
+            updateFields.description_en = translated.description || ""
+          } else {
+            updateFields.title_fr = translated.title
+            updateFields.description_fr = translated.description || ""
+          }
+          const { data: updated } = await supabase
+            .from("tasks")
+            .update(updateFields)
+            .eq("id", task.id)
+            .select()
+          if (updated?.[0]) {
+            setTasks((prev) => prev.map((t) => (t.id === task.id ? updated[0] : t)))
+          }
+        })
+        .catch((err) => console.warn("[Translate] Background translation failed:", err))
     }
-  }, [supabase, userId, toast])
+  }, [supabase, userId, toast, locale])
 
   const handleUpdate = useCallback(async (data: TaskInsert & { id: string }) => {
     const { id, ...rest } = data
@@ -166,7 +211,7 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
   const SAFE_CATEGORIES = new Set(["personal", "work", "study", "travel", "health", "finance", "hobby"])
   const SAFE_PRIORITIES = new Set(["low", "medium", "high"])
 
-  const handleAIConfirm = useCallback(async (suggested: AISuggestedTask[]) => {
+  const handleAIConfirm = useCallback(async (suggested: AISuggestedTask[], goalLabel: string, groupTitleFr?: string, groupTitleEn?: string) => {
     // Verify session is still valid — prevents RLS violations from expired tokens
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
@@ -179,6 +224,10 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
       const row: Record<string, unknown> = {
         title: s.title,
         description: s.description,
+        title_fr: s.title_fr ?? null,
+        title_en: s.title_en ?? null,
+        description_fr: s.description_fr ?? null,
+        description_en: s.description_en ?? null,
         duration: s.duration,
         priority: SAFE_PRIORITIES.has(s.priority) ? s.priority : "medium",
         category: SAFE_CATEGORIES.has(s.category) ? s.category : "personal",
@@ -209,6 +258,17 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
       toast("error", t("toast.failedAI") + ": " + error.message)
     } else if (rows) {
       setTasks((prev) => [...prev, ...rows])
+      // Create a group for the AI tasks with bilingual labels
+      const groupId = crypto.randomUUID()
+      const fallbackLabel = goalLabel.length > 60 ? goalLabel.slice(0, 57) + "…" : goalLabel
+      setGroups((prev) => [...prev, {
+        id: groupId,
+        label: (locale === "fr" ? groupTitleFr : groupTitleEn) || fallbackLabel,
+        label_fr: groupTitleFr || fallbackLabel,
+        label_en: groupTitleEn || fallbackLabel,
+        taskIds: rows.map((r: Task) => r.id),
+        isCollapsed: false,
+      }])
       toast("success", t("toast.aiTasksAdded"))
     }
   }, [supabase, userId, toast])
@@ -257,6 +317,50 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
     setFormOpen(true)
   }
 
+  // ── Group helpers ──
+  function toggleGroup(groupId: string) {
+    setGroups((prev) => prev.map((g) => g.id === groupId ? { ...g, isCollapsed: !g.isCollapsed } : g))
+  }
+  function removeGroup(groupId: string) {
+    setGroups((prev) => prev.filter((g) => g.id !== groupId))
+  }
+  function toggleSelectTask(taskId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      next.has(taskId) ? next.delete(taskId) : next.add(taskId)
+      return next
+    })
+  }
+  function createManualGroup() {
+    if (selectedIds.size === 0) return
+    const groupId = crypto.randomUUID()
+    setGroups((prev) => [...prev, {
+      id: groupId,
+      label: t("group.createGroup"),
+      taskIds: Array.from(selectedIds),
+      isCollapsed: false,
+    }])
+    setSelectedIds(new Set())
+    setSelectionMode(false)
+  }
+  function startRename(groupId: string, currentLabel: string) {
+    setRenamingGroupId(groupId)
+    setRenameValue(currentLabel)
+  }
+  function confirmRename() {
+    if (!renamingGroupId) return
+    const trimmed = renameValue.trim()
+    if (trimmed) {
+      setGroups((prev) => prev.map((g) => g.id === renamingGroupId ? { ...g, label: trimmed } : g))
+    }
+    setRenamingGroupId(null)
+    setRenameValue("")
+  }
+
+  // Group-aware task partitioning
+  const groupedTaskIds = new Set(groups.flatMap((g) => g.taskIds))
+  const ungroupedTasks = filteredTasks.filter((tk) => !groupedTaskIds.has(tk.id))
+
   return (
     <div className="flex h-screen overflow-hidden bg-[#0c0c10]">
       <Sidebar
@@ -269,26 +373,138 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
       />
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Topbar onNewTask={openNew} onSuggestPlan={() => setAiDialogOpen(true)} />
+        <Topbar onNewTask={openNew} onSuggestPlan={() => setAiDialogOpen(true)} tasks={tasks.filter((tk) => !tk.is_archived)} onSelectTask={openEdit} />
 
         <main className="flex-1 space-y-6 overflow-y-auto p-6">
-          {!isArchiveView && <CalendarView tasks={tasks.filter(t => !t.is_archived)} onReschedule={handleReschedule} />}
-          {isArchiveView && (
-            <div className="flex items-center gap-2 px-1">
-              <Archive className="size-5 text-amber-400" />
-              <h2 className="text-lg font-semibold text-white">{t("archive.title")}</h2>
-              <span className="ml-2 text-sm text-muted-foreground">({filteredTasks.length})</span>
+          {!isArchiveView && <CalendarView tasks={tasks.filter(tk => !tk.is_archived)} onReschedule={handleReschedule} />}
+          {isArchiveView && (() => {
+            const now = new Date()
+            const expiredTasks = filteredTasks.filter((tk) => tk.due_date && new Date(tk.due_date) < now)
+            const upcomingTasks = filteredTasks.filter((tk) => tk.due_date && new Date(tk.due_date) >= now)
+            const noDateTasks = filteredTasks.filter((tk) => !tk.due_date)
+            const renderSection = (title: string, sectionTasks: typeof filteredTasks, color: string) => (
+              <div className="glass-card rounded-xl shadow-3d overflow-hidden animate-fade-up">
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-white/5">
+                  <div className={`size-2 rounded-full ${color}`} />
+                  <h3 className="text-sm font-semibold text-white">{title}</h3>
+                  <span className="text-[10px] text-muted-foreground">({sectionTasks.length})</span>
+                </div>
+                {sectionTasks.length > 0 ? (
+                  <div className="p-4">
+                    <TaskList tasks={sectionTasks} onDeleteTask={handleDelete} onRestoreTask={handleRestore} isArchiveView />
+                  </div>
+                ) : (
+                  <p className="px-4 py-6 text-center text-sm text-muted-foreground">{t("archive.empty")}</p>
+                )}
+              </div>
+            )
+            return (
+              <>
+                <div className="flex items-center gap-2 px-1">
+                  <Archive className="size-5 text-amber-400" />
+                  <h2 className="text-lg font-semibold text-white">{t("archive.title")}</h2>
+                  <span className="ml-2 text-sm text-muted-foreground">({filteredTasks.length})</span>
+                </div>
+                {renderSection(t("archive.expired"), expiredTasks, "bg-red-500")}
+                {renderSection(t("archive.upcoming"), upcomingTasks, "bg-emerald-500")}
+                {renderSection(t("archive.noDate"), noDateTasks, "bg-gray-500")}
+              </>
+            )
+          })()}
+
+          {/* ── Selection mode toggle ── */}
+          {!isArchiveView && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setSelectionMode(!selectionMode); setSelectedIds(new Set()) }}
+                className={`text-xs ${selectionMode ? "border-purple-500/50 bg-purple-500/10 text-purple-300" : "border-white/10 text-muted-foreground"}`}
+              >
+                <CheckSquare className="size-3.5 mr-1" />
+                {selectionMode ? t("group.cancelSelect") : t("group.selectMode")}
+              </Button>
+              {selectionMode && selectedIds.size > 0 && (
+                <Button size="sm" onClick={createManualGroup} className="bg-gradient-to-r from-indigo-500 to-purple-600 text-xs text-white">
+                  {t("group.manualGroup")} ({selectedIds.size})
+                </Button>
+              )}
             </div>
           )}
-          <TaskList
-            tasks={filteredTasks}
-            onEditTask={isArchiveView ? undefined : openEdit}
-            onDeleteTask={handleDelete}
-            onArchiveTask={handleArchive}
-            onRestoreTask={handleRestore}
-            onStatusChange={isArchiveView ? undefined : handleStatusChange}
-            isArchiveView={isArchiveView}
-          />
+
+          {/* ── Task Groups (collapsible cards) ── */}
+          {!isArchiveView && groups.map((group) => {
+            // Check against ALL non-archived tasks so the group stays visible even when filters narrow the view
+            const allGroupTasks = tasks.filter((tk) => !tk.is_archived && group.taskIds.includes(tk.id))
+            if (allGroupTasks.length === 0) return null
+            const groupTasks = filteredTasks.filter((tk) => group.taskIds.includes(tk.id))
+            return (
+              <div key={group.id} className="glass-card rounded-xl shadow-3d overflow-hidden animate-fade-up">
+                <div className="flex w-full items-center gap-3 px-4 py-3 transition-colors hover:bg-white/5">
+                  <button onClick={() => toggleGroup(group.id)} className="flex flex-1 items-center gap-3 text-left">
+                    <Sparkles className="size-4 text-purple-400 shrink-0" />
+                    {renamingGroupId === group.id ? (
+                      <input
+                        autoFocus
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onBlur={confirmRename}
+                        onKeyDown={(e) => { if (e.key === "Enter") confirmRename(); if (e.key === "Escape") { setRenamingGroupId(null) } }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex-1 bg-transparent text-sm font-semibold text-white outline-none border-b border-purple-500/50 pb-0.5"
+                      />
+                    ) : (
+                      <span className="flex-1 text-sm font-semibold text-white truncate">{(locale === "fr" ? group.label_fr : group.label_en) || group.label}</span>
+                    )}
+                    <span className="text-[10px] text-muted-foreground shrink-0">{t("group.tasks", { count: groupTasks.length })}</span>
+                    <ChevronDown className={`size-4 text-muted-foreground transition-transform ${group.isCollapsed ? "-rotate-90" : ""}`} />
+                  </button>
+                  <button
+                    onClick={() => startRename(group.id, group.label)}
+                    className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-white"
+                    title={t("group.rename")}
+                  >
+                    <Pencil className="size-3" />
+                  </button>
+                  <button
+                    onClick={() => removeGroup(group.id)}
+                    className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400"
+                    title={t("group.ungroup")}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+                {!group.isCollapsed && (
+                  <div className="border-t border-white/5 p-4">
+                    <TaskList
+                      tasks={groupTasks}
+                      onEditTask={selectionMode ? undefined : openEdit}
+                      onDeleteTask={handleDelete}
+                      onArchiveTask={handleArchive}
+                      onStatusChange={selectionMode ? undefined : handleStatusChange}
+                      selectable={selectionMode}
+                      selectedIds={selectedIds}
+                      onToggleSelect={toggleSelectTask}
+                    />
+                  </div>
+                )}
+              </div>
+            )
+          })}
+
+          {/* ── Ungrouped tasks (non-archive only) ── */}
+          {!isArchiveView && (
+            <TaskList
+              tasks={ungroupedTasks}
+              onEditTask={selectionMode ? undefined : openEdit}
+              onDeleteTask={handleDelete}
+              onArchiveTask={handleArchive}
+              onStatusChange={selectionMode ? undefined : handleStatusChange}
+              selectable={selectionMode}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelectTask}
+            />
+          )}
 
           {/* Footer */}
           <footer className="mt-2 border-t border-white/5 py-1.5">

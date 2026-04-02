@@ -14,7 +14,7 @@ import type { AISuggestedTask } from "@/types/task"
 interface AISuggestDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onConfirm: (tasks: AISuggestedTask[]) => void
+  onConfirm: (tasks: AISuggestedTask[], goalLabel: string, groupTitleFr?: string, groupTitleEn?: string) => void
 }
 
 export function AISuggestDialog({ open, onOpenChange, onConfirm }: AISuggestDialogProps) {
@@ -27,6 +27,8 @@ export function AISuggestDialog({ open, onOpenChange, onConfirm }: AISuggestDial
   const [error, setError] = useState<string | null>(null)
   const [goalError, setGoalError] = useState<string | null>(null)
   const [goalTouched, setGoalTouched] = useState(false)
+  const [groupTitleFr, setGroupTitleFr] = useState<string | undefined>()
+  const [groupTitleEn, setGroupTitleEn] = useState<string | undefined>()
 
   function validateGoal(value: string): string | null {
     const trimmed = value.trim()
@@ -57,6 +59,8 @@ export function AISuggestDialog({ open, onOpenChange, onConfirm }: AISuggestDial
       const tasks: AISuggestedTask[] = data.tasks ?? []
       setSuggestions(tasks)
       setSelected(new Set(tasks.map((_, i) => i)))
+      setGroupTitleFr(data.group_title_fr || undefined)
+      setGroupTitleEn(data.group_title_en || undefined)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong")
     } finally {
@@ -74,7 +78,7 @@ export function AISuggestDialog({ open, onOpenChange, onConfirm }: AISuggestDial
 
   function handleConfirm() {
     const chosen = suggestions.filter((_, i) => selected.has(i))
-    if (chosen.length > 0) onConfirm(chosen)
+    if (chosen.length > 0) onConfirm(chosen, goal.trim(), groupTitleFr, groupTitleEn)
     handleClose()
   }
 
@@ -153,8 +157,8 @@ export function AISuggestDialog({ open, onOpenChange, onConfirm }: AISuggestDial
                     {selected.has(i) && <Check className="size-3 text-purple-400" />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white">{task.title}</p>
-                    {task.description && <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{task.description}</p>}
+                    <p className="text-sm font-medium text-white">{(locale === "fr" ? task.title_fr : task.title_en) || task.title}</p>
+                    {((locale === "fr" ? task.description_fr : task.description_en) || task.description) && <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{(locale === "fr" ? task.description_fr : task.description_en) || task.description}</p>}
                     <div className="mt-1.5 flex flex-wrap items-center gap-2">
                       <Badge variant="outline" className={priorityColor[task.priority] ?? ""}>{t(`priority.${task.priority}` as "priority.low" | "priority.medium" | "priority.high")}</Badge>
                       {task.category && <Badge variant="outline" className="bg-indigo-500/15 text-indigo-400 border-indigo-500/20"><Tag className="size-2.5 mr-1" />{t(`cat.${task.category}` as "cat.personal" | "cat.work" | "cat.study" | "cat.travel" | "cat.health" | "cat.finance" | "cat.hobby")}</Badge>}

@@ -12,20 +12,17 @@ import * as gemini from "./providers/gemini"
 import * as ollama from "./providers/ollama"
 
 // ─── System prompt builder ──────────────────────────────────────────
-const LANG_INSTRUCTIONS: Record<string, string> = {
-  fr: "IMPORTANT: Réponds ENTIÈREMENT en français. Tous les titres, descriptions et contenus doivent être en français.",
-  en: "IMPORTANT: Respond ENTIRELY in English. All titles, descriptions and content must be in English.",
-}
-
 function buildSystemPrompt(locale?: string): string {
-  const lang = LANG_INSTRUCTIONS[locale ?? "en"] ?? LANG_INSTRUCTIONS.en
+  const primary = locale === "fr" ? "français" : "English"
   const today = new Date().toISOString().split("T")[0]
   return `You are an expert project planner.
 
 A user gives you a goal. Create a CONCRETE plan with tasks directly related to that goal.
 Today's date is ${today}.
 
-${lang}
+IMPORTANT: The user's primary language is ${primary}.
+- "title" and "description" must be in ${primary}.
+- You MUST also provide translations in BOTH languages using the fields "title_fr", "title_en", "description_fr", "description_en".
 
 STRICT RULES:
 - Generate EXACTLY 4 to 6 tasks. Never more than 6, never fewer than 4.
@@ -45,20 +42,30 @@ STRICT RULES:
   * NEVER mark all tasks as "high"
 - Estimate realistic durations (30m, 1h, 2h, 4h, 1d)
 - Do NOT include personal data
-- Return ONLY valid JSON array, no markdown, no explanation, no wrapping
+- Return ONLY valid JSON object (NOT an array), no markdown, no explanation, no wrapping
+- The object MUST have "group_title_fr", "group_title_en", and "tasks" keys
+- "group_title_fr" / "group_title_en": a SHORT, CONCISE label (max 6 words) that captures the general theme/idea of all tasks — NOT a copy of the user's request. Example: "Préparation voyage Japon", "Website Redesign", "Exam Study Plan"
 
 JSON format:
-[
-  {
-    "title": "short specific task title",
-    "description": "what to do concretely",
-    "duration": "estimated time",
-    "priority": "low | medium | high",
-    "category": "work | study | personal | ...",
-    "due_date": "YYYY-MM-DD or null",
-    "start_date": "YYYY-MM-DD or null"
-  }
-]`
+{
+  "group_title_fr": "court titre résumant le thème en français (max 6 mots)",
+  "group_title_en": "short theme summary in English (max 6 words)",
+  "tasks": [
+    {
+      "title": "task title in user's language",
+      "description": "what to do in user's language",
+      "title_fr": "titre en français",
+      "title_en": "title in English",
+      "description_fr": "description en français",
+      "description_en": "description in English",
+      "duration": "estimated time",
+      "priority": "low | medium | high",
+      "category": "work | study | personal | ...",
+      "due_date": "YYYY-MM-DD or null",
+      "start_date": "YYYY-MM-DD or null"
+    }
+  ]
+}`
 }
 
 // ─── Provider registry (order = priority) ───────────────────────────
@@ -78,6 +85,8 @@ export interface AIResult {
   tasks: ValidatedTask[]
   provider: string
   isFallback: boolean
+  group_title_fr: string | null
+  group_title_en: string | null
 }
 
 export async function generatePlan(rawGoal: string, rawDeadline?: string, locale?: string): Promise<AIResult> {
@@ -85,7 +94,7 @@ export async function generatePlan(rawGoal: string, rawDeadline?: string, locale
   const deadline = sanitizeDeadline(rawDeadline)
 
   if (!goal || goal.length < 2) {
-    return { tasks: getFallbackPlan(rawGoal, locale), provider: "fallback", isFallback: true }
+    return { tasks: getFallbackPlan(rawGoal, locale), provider: "fallback", isFallback: true, group_title_fr: null, group_title_en: null }
   }
 
   const prompt = `${buildSystemPrompt(locale)}\n\nGoal: ${goal}\nDeadline: ${deadline}`
@@ -97,10 +106,10 @@ export async function generatePlan(rawGoal: string, rawDeadline?: string, locale
       const raw = await fn(prompt)
       console.log(`[AI] ✓ ${name} responded`)
 
-      const tasks = validateAIResponse(raw)
-      if (tasks) {
-        console.log(`[AI] ✓ Validated ${tasks.length} tasks from ${name}`)
-        return { tasks, provider: name, isFallback: false }
+      const result = validateAIResponse(raw)
+      if (result) {
+        console.log(`[AI] ✓ Validated ${result.tasks.length} tasks from ${name}`)
+        return { tasks: result.tasks, provider: name, isFallback: false, group_title_fr: result.group_title_fr, group_title_en: result.group_title_en }
       }
 
       console.warn(`[AI] ✗ ${name} returned invalid structure, trying next...`)
@@ -111,6 +120,6 @@ export async function generatePlan(rawGoal: string, rawDeadline?: string, locale
 
   // All providers failed → return static fallback
   console.warn("[AI] All providers failed — using fallback plan")
-  return { tasks: getFallbackPlan(goal, locale), provider: "fallback", isFallback: true }
+  return { tasks: getFallbackPlan(goal, locale), provider: "fallback", isFallback: true, group_title_fr: null, group_title_en: null }
 }
 

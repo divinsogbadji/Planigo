@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CheckCircle2 } from "lucide-react"
 import { useTranslation } from "@/lib/i18n"
-import type { Task, TaskInsert, Category, Status, Priority } from "@/types/task"
+import type { Task, TaskInsert } from "@/types/task"
 
 interface TaskFormProps {
   open: boolean
@@ -48,7 +48,10 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
   const [touched, setTouched] = useState<Set<string>>(new Set())
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
-  useEffect(() => {
+  // Adjust state based on props (React-recommended pattern instead of useEffect)
+  const [prevProps, setPrevProps] = useState<{ task: Task | null | undefined; open: boolean }>({ task: undefined, open: false })
+  if (prevProps.task !== task || prevProps.open !== open) {
+    setPrevProps({ task, open })
     if (task) {
       setForm({
         title: task.title ?? "",
@@ -60,7 +63,6 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
         duration: task.duration,
         priority: task.priority ?? "medium",
       })
-      // Detect date mode from existing data
       if (task.start_date && task.due_date && task.duration) {
         setDateMode("with_duration")
       } else if (task.start_date && task.due_date) {
@@ -75,7 +77,7 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
     setErrors({})
     setTouched(new Set())
     setSuccessMsg(null)
-  }, [task, open])
+  }
 
   function validate(data: TaskInsert): FieldErrors {
     const errs: FieldErrors = {}

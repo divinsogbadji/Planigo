@@ -1,21 +1,77 @@
 "use client"
 
-import { Plus, Sparkles } from "lucide-react"
+import { useState, useRef, useEffect } from "react"
+import { Plus, Sparkles, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useTranslation } from "@/lib/i18n"
+import type { Task } from "@/types/task"
 
 interface TopbarProps {
   onNewTask?: () => void
   onSuggestPlan?: () => void
+  tasks?: Task[]
+  onSelectTask?: (task: Task) => void
 }
 
-export function Topbar({ onNewTask, onSuggestPlan }: TopbarProps) {
-  const { t } = useTranslation()
+export function Topbar({ onNewTask, onSuggestPlan, tasks = [], onSelectTask }: TopbarProps) {
+  const { t, locale } = useTranslation()
+  const [query, setQuery] = useState("")
+  const [showResults, setShowResults] = useState(false)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  const results = query.trim().length >= 2
+    ? tasks.filter((tk) => {
+        const q = query.toLowerCase()
+        return tk.title.toLowerCase().includes(q)
+          || tk.description?.toLowerCase().includes(q)
+          || tk.title_fr?.toLowerCase().includes(q)
+          || tk.title_en?.toLowerCase().includes(q)
+          || tk.description_fr?.toLowerCase().includes(q)
+          || tk.description_en?.toLowerCase().includes(q)
+      }).slice(0, 6)
+    : []
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setShowResults(false)
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  const dateFmt = (d: string) => new Date(d).toLocaleDateString(locale === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric" })
+
   return (
-    <header className="glass flex items-center justify-between border-b border-white/5 px-6 py-4">
-      <div>
-        <h2 className="text-lg font-semibold text-white">{t("topbar.dashboard")}</h2>
-        <p className="text-xs text-muted-foreground">{t("topbar.subtitle")}</p>
+    <header className="glass relative z-50 flex items-center justify-between border-b border-white/5 px-6 py-4">
+      {/* Search bar */}
+      <div ref={wrapperRef} className="relative w-64">
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setShowResults(true) }}
+          onFocus={() => setShowResults(true)}
+          placeholder={t("search.placeholder")}
+          className="h-9 w-full rounded-lg border border-white/10 bg-white/5 pl-9 pr-3 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-purple-500/50 focus:bg-white/[0.07]"
+        />
+        {showResults && query.trim().length >= 2 && (
+          <div className="absolute left-0 top-full z-[9999] mt-1 w-80 rounded-xl border border-white/10 bg-[#1a1a24] p-1 shadow-xl">
+            {results.length === 0 ? (
+              <p className="px-3 py-2 text-xs text-muted-foreground">{t("search.noResults")}</p>
+            ) : (
+              results.map((tk) => (
+                <button
+                  key={tk.id}
+                  onClick={() => { onSelectTask?.(tk); setQuery(""); setShowResults(false) }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white transition-colors hover:bg-white/5"
+                >
+                  <span className="flex-1 truncate">{(locale === "fr" ? tk.title_fr : tk.title_en) || tk.title}</span>
+                  {tk.due_date && <span className="shrink-0 text-[10px] text-muted-foreground">{dateFmt(tk.due_date)}</span>}
+                </button>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-3">

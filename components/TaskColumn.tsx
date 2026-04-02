@@ -21,9 +21,12 @@ interface TaskColumnProps {
   onRestoreTask?: (taskId: string) => void
   onStatusChange?: (taskId: string, newStatus: Status) => void
   isArchiveView?: boolean
+  selectable?: boolean
+  selectedIds?: Set<string>
+  onToggleSelect?: (taskId: string) => void
 }
 
-export function TaskColumn({ status, tasks, onEditTask, onDeleteTask, onArchiveTask, onRestoreTask, onStatusChange, isArchiveView }: TaskColumnProps) {
+export function TaskColumn({ status, tasks, onEditTask, onDeleteTask, onArchiveTask, onRestoreTask, onStatusChange, isArchiveView, selectable, selectedIds, onToggleSelect }: TaskColumnProps) {
   const { t } = useTranslation()
   const meta = statusMeta[status]
   const [dragOver, setDragOver] = useState(false)
@@ -40,6 +43,7 @@ export function TaskColumn({ status, tasks, onEditTask, onDeleteTask, onArchiveT
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
+    e.stopPropagation()
     setDragOver(false)
     const taskId = e.dataTransfer.getData("text/plain")
     if (taskId && onStatusChange) {
@@ -71,7 +75,7 @@ export function TaskColumn({ status, tasks, onEditTask, onDeleteTask, onArchiveT
           </div>
         )}
         {tasks.map((task) => (
-          <TaskCard key={task.id} task={task} onEdit={onEditTask} onDelete={onDeleteTask} onArchive={onArchiveTask} onRestore={onRestoreTask} isArchiveView={isArchiveView} />
+          <TaskCard key={task.id} task={task} onEdit={onEditTask} onDelete={onDeleteTask} onArchive={onArchiveTask} onRestore={onRestoreTask} isArchiveView={isArchiveView} selectable={selectable} selected={selectedIds?.has(task.id)} onToggleSelect={onToggleSelect} />
         ))}
       </div>
     </div>

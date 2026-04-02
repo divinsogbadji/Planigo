@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
+import { createContext, useContext, useState, useCallback, type ReactNode } from "react"
 import { translations, type Locale } from "./translations"
 
 type TranslationKey = keyof typeof translations.en
@@ -15,15 +15,16 @@ const I18nContext = createContext<I18nContextValue | null>(null)
 
 const STORAGE_KEY = "planigo-locale"
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("fr")
-
-  useEffect(() => {
+function getInitialLocale(): Locale {
+  if (typeof window !== "undefined") {
     const saved = localStorage.getItem(STORAGE_KEY) as Locale | null
-    if (saved && (saved === "en" || saved === "fr")) {
-      setLocaleState(saved)
-    }
-  }, [])
+    if (saved && (saved === "en" || saved === "fr")) return saved
+  }
+  return "fr"
+}
+
+export function I18nProvider({ children }: { children: ReactNode }) {
+  const [locale, setLocaleState] = useState<Locale>(getInitialLocale)
 
   const setLocale = useCallback((newLocale: Locale) => {
     setLocaleState(newLocale)

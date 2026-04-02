@@ -13,9 +13,12 @@ interface TaskListProps {
   onRestoreTask?: (taskId: string) => void
   onStatusChange?: (taskId: string, newStatus: Status) => void
   isArchiveView?: boolean
+  selectable?: boolean
+  selectedIds?: Set<string>
+  onToggleSelect?: (taskId: string) => void
 }
 
-export function TaskList({ tasks, onEditTask, onDeleteTask, onArchiveTask, onRestoreTask, onStatusChange, isArchiveView }: TaskListProps) {
+export function TaskList({ tasks, onEditTask, onDeleteTask, onArchiveTask, onRestoreTask, onStatusChange, isArchiveView, selectable, selectedIds, onToggleSelect }: TaskListProps) {
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
       {columns.map((status) => (
@@ -29,6 +32,9 @@ export function TaskList({ tasks, onEditTask, onDeleteTask, onArchiveTask, onRes
           onRestoreTask={onRestoreTask}
           onStatusChange={onStatusChange}
           isArchiveView={isArchiveView}
+          selectable={selectable}
+          selectedIds={selectedIds}
+          onToggleSelect={onToggleSelect}
         />
       ))}
     </div>

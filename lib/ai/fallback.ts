@@ -5,105 +5,50 @@
 
 import type { ValidatedTask } from "./validate"
 
-const fallbacks: Record<string, (goal: string) => ValidatedTask[]> = {
-  en: (goal) => [
-    {
-      title: "Define the objective clearly",
-      description: `Understand the goal: "${goal.slice(0, 80)}${goal.length > 80 ? "..." : ""}"`,
-      duration: "30m",
-      priority: "high",
-      category: "personal",
-      due_date: null,
-      start_date: null,
-    },
-    {
-      title: "Break into smaller steps",
-      description: "Divide the objective into manageable subtasks",
-      duration: "1h",
-      priority: "medium",
-      category: "personal",
-      due_date: null,
-      start_date: null,
-    },
-    {
-      title: "Gather necessary resources",
-      description: "Identify tools, documents, or people needed",
-      duration: "30m",
-      priority: "medium",
-      category: "personal",
-      due_date: null,
-      start_date: null,
-    },
-    {
-      title: "Execute the first step",
-      description: "Start with the most impactful action",
-      duration: "2h",
-      priority: "high",
-      category: "personal",
-      due_date: null,
-      start_date: null,
-    },
-    {
-      title: "Review and adjust",
-      description: "Evaluate progress and refine the plan",
-      duration: "30m",
-      priority: "low",
-      category: "personal",
-      due_date: null,
-      start_date: null,
-    },
-  ],
-  fr: (goal) => [
-    {
-      title: "Définir l'objectif clairement",
-      description: `Comprendre l'objectif : « ${goal.slice(0, 80)}${goal.length > 80 ? "…" : ""} »`,
-      duration: "30m",
-      priority: "high",
-      category: "personal",
-      due_date: null,
-      start_date: null,
-    },
-    {
-      title: "Découper en étapes",
-      description: "Diviser l'objectif en sous-tâches réalisables",
-      duration: "1h",
-      priority: "medium",
-      category: "personal",
-      due_date: null,
-      start_date: null,
-    },
-    {
-      title: "Rassembler les ressources nécessaires",
-      description: "Identifier les outils, documents ou personnes nécessaires",
-      duration: "30m",
-      priority: "medium",
-      category: "personal",
-      due_date: null,
-      start_date: null,
-    },
-    {
-      title: "Exécuter la première étape",
-      description: "Commencer par l'action la plus impactante",
-      duration: "2h",
-      priority: "high",
-      category: "personal",
-      due_date: null,
-      start_date: null,
-    },
-    {
-      title: "Réviser et ajuster",
-      description: "Évaluer la progression et affiner le plan",
-      duration: "30m",
-      priority: "low",
-      category: "personal",
-      due_date: null,
-      start_date: null,
-    },
-  ],
+/** Helper to build a bilingual fallback task */
+function fb(
+  titleFr: string, titleEn: string,
+  descFr: string, descEn: string,
+  duration: string, priority: ValidatedTask["priority"],
+): ValidatedTask {
+  return {
+    title: titleFr, description: descFr, // overridden by locale in getFallbackPlan
+    title_fr: titleFr, title_en: titleEn,
+    description_fr: descFr, description_en: descEn,
+    duration, priority, category: "personal", due_date: null, start_date: null,
+  }
 }
 
+const fallbackTasks = (goal: string): ValidatedTask[] => [
+  fb("Définir l'objectif clairement", "Define the objective clearly",
+    `Comprendre l'objectif : « ${goal.slice(0, 80)}${goal.length > 80 ? "…" : ""} »`,
+    `Understand the goal: "${goal.slice(0, 80)}${goal.length > 80 ? "..." : ""}"`,
+    "30m", "high"),
+  fb("Découper en étapes", "Break into smaller steps",
+    "Diviser l'objectif en sous-tâches réalisables",
+    "Divide the objective into manageable subtasks",
+    "1h", "medium"),
+  fb("Rassembler les ressources nécessaires", "Gather necessary resources",
+    "Identifier les outils, documents ou personnes nécessaires",
+    "Identify tools, documents, or people needed",
+    "30m", "medium"),
+  fb("Exécuter la première étape", "Execute the first step",
+    "Commencer par l'action la plus impactante",
+    "Start with the most impactful action",
+    "2h", "high"),
+  fb("Réviser et ajuster", "Review and adjust",
+    "Évaluer la progression et affiner le plan",
+    "Evaluate progress and refine the plan",
+    "30m", "low"),
+]
+
 export function getFallbackPlan(goal: string, locale?: string): ValidatedTask[] {
-  const fn = fallbacks[locale ?? "en"] ?? fallbacks.en
-  return fn(goal)
+  const tasks = fallbackTasks(goal)
+  // Set the main title/description to match the user's locale
+  return tasks.map((t) => ({
+    ...t,
+    title: locale === "fr" ? (t.title_fr ?? t.title) : (t.title_en ?? t.title),
+    description: locale === "fr" ? (t.description_fr ?? t.description) : (t.description_en ?? t.description),
+  }))
 }
 

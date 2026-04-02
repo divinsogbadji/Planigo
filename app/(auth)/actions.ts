@@ -26,14 +26,23 @@ export async function signup(formData: FormData) {
   const supabase = await createClient()
   const isDev = process.env.NEXT_PUBLIC_APP_ENV === "development"
 
-  const data = {
-    email: formData.get("email") as string,
-    password: formData.get("password") as string,
-  }
+  const email = formData.get("email") as string
+  const password = formData.get("password") as string
+  const firstName = (formData.get("firstName") as string)?.trim() ?? ""
+  const lastName = (formData.get("lastName") as string)?.trim() ?? ""
 
   const { error, data: signUpData } = await supabase.auth.signUp({
-    ...data,
-    options: isDev ? { emailRedirectTo: undefined } : undefined,
+    email,
+    password,
+    options: {
+      ...(isDev ? { emailRedirectTo: undefined } : {}),
+      data: {
+        first_name: firstName,
+        last_name: lastName,
+        notifications: true,
+        auto_archive: false,
+      },
+    },
   })
 
   if (error) {
@@ -48,7 +57,7 @@ export async function signup(formData: FormData) {
     fetch(`${baseUrl}/api/welcome-email`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: data.email }),
+      body: JSON.stringify({ email }),
     }).catch(() => {}) // silently ignore
   } catch {
     // ignore welcome email errors
