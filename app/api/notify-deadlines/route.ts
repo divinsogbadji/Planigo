@@ -4,11 +4,21 @@ import nodemailer from "nodemailer"
 
 const FROM_EMAIL = "noreply.planigoteams@gmail.com"
 
+/** Reminder thresholds by priority (in hours before deadline) */
+const REMINDER_HOURS: Record<string, number> = {
+  high: 48,
+  medium: 24,
+  low: 12,
+}
+
 /**
  * GET /api/notify-deadlines
- * Checks for tasks with deadlines in the next 24h and sends email reminders.
+ * 1. Checks for tasks approaching deadline based on priority thresholds
+ *    - High: 48h before | Medium: 24h before | Low: 12h before
+ * 2. Auto-archives expired tasks (if user enabled auto_archive)
+ * 3. Sends email reminders and auto-archive notifications
+ * Only notifies users who have enabled notifications in their profile.
  * Can be called by a cron job (e.g. Vercel Cron, or external service).
- * Requires SUPABASE_SERVICE_ROLE_KEY for server-side access.
  */
 export async function GET(req: NextRequest) {
   // Verify cron secret to prevent abuse
@@ -18,11 +28,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const smtpPass = process.env.SMTP_PASS
-  if (!smtpPass || smtpPass === "your-gmail-app-password-here") {
-    return NextResponse.json({ skipped: true, reason: "SMTP not configured" })
-  }
-
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supabaseUrl || !serviceKey) {
@@ -30,90 +35,204 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = createClient(supabaseUrl, serviceKey)
-
-  // Find non-archived tasks with due_date in the next 24 hours
   const now = new Date()
-  const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+  const maxWindow = new Date(now.getTime() + 48 * 60 * 60 * 1000) // 48h max window
 
+  // ── 1. REMINDER NOTIFICATIONS ──────────────────────────────────────
   const { data: tasks, error } = await supabase
     .from("tasks")
-    .select("id, title, due_date, user_id, priority")
+    .select("id, title, title_fr, title_en, due_date, user_id, priority")
     .eq("is_archived", false)
     .neq("status", "done")
+    .not("due_date", "is", null)
     .gte("due_date", now.toISOString())
-    .lte("due_date", in24h.toISOString())
+    .lte("due_date", maxWindow.toISOString())
 
   if (error) {
     console.error("[Deadlines] Query error:", error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  if (!tasks || tasks.length === 0) {
-    return NextResponse.json({ sent: 0, message: "No upcoming deadlines" })
-  }
-
-  // Group tasks by user
-  const byUser: Record<string, typeof tasks> = {}
-  for (const task of tasks) {
-    if (!byUser[task.user_id]) byUser[task.user_id] = []
-    byUser[task.user_id].push(task)
-  }
-
-  // Get user emails from Supabase Auth
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER || FROM_EMAIL,
-      pass: smtpPass,
-    },
+  // Filter tasks by their priority-specific threshold
+  const eligibleTasks = (tasks ?? []).filter((t) => {
+    const hoursLeft = (new Date(t.due_date).getTime() - now.getTime()) / (1000 * 60 * 60)
+    const threshold = REMINDER_HOURS[t.priority] ?? 24
+    return hoursLeft <= threshold
   })
 
-  let sentCount = 0
+  // Group by user
+  const remindersByUser: Record<string, typeof eligibleTasks> = {}
+  for (const task of eligibleTasks) {
+    if (!remindersByUser[task.user_id]) remindersByUser[task.user_id] = []
+    remindersByUser[task.user_id].push(task)
+  }
 
-  for (const [userId, userTasks] of Object.entries(byUser)) {
-    // Get user email from auth.users
+  // ── 2. AUTO-ARCHIVE EXPIRED TASKS ─────────────────────────────────
+  const { data: expiredTasks } = await supabase
+    .from("tasks")
+    .select("id, title, title_fr, title_en, user_id, due_date, priority")
+    .eq("is_archived", false)
+    .neq("status", "done")
+    .not("due_date", "is", null)
+    .lt("due_date", now.toISOString())
+
+  // ── 3. PROCESS PER USER ───────────────────────────────────────────
+  // Collect all unique user IDs
+  const allUserIds = new Set<string>()
+  for (const uid of Object.keys(remindersByUser)) allUserIds.add(uid)
+  for (const t of expiredTasks ?? []) allUserIds.add(t.user_id)
+
+  let archiveCount = 0
+  let emailCount = 0
+
+  // Setup email transporter (optional — only if SMTP configured)
+  const smtpPass = process.env.SMTP_PASS
+  const smtpConfigured = smtpPass && smtpPass !== "your-gmail-app-password-here"
+  const transporter = smtpConfigured
+    ? nodemailer.createTransport({
+        host: process.env.SMTP_HOST || "smtp.gmail.com",
+        port: Number(process.env.SMTP_PORT) || 587,
+        secure: false,
+        auth: { user: process.env.SMTP_USER || FROM_EMAIL, pass: smtpPass },
+      })
+    : null
+
+  for (const userId of allUserIds) {
+    // Get user preferences from auth metadata
     const { data: userData } = await supabase.auth.admin.getUserById(userId)
-    const userEmail = userData?.user?.email
-    if (!userEmail) continue
+    const user = userData?.user
+    if (!user) continue
 
-    const taskListHtml = userTasks
-      .map((t) => {
-        const date = new Date(t.due_date!).toLocaleString("fr-FR", {
-          day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+    const prefs = user.user_metadata ?? {}
+    const notificationsEnabled = prefs.notifications !== false // default true
+    const autoArchiveEnabled = prefs.auto_archive === true     // default false
+
+    // ── Auto-archive expired tasks for this user ──
+    if (autoArchiveEnabled && expiredTasks) {
+      const userExpired = expiredTasks.filter((t) => t.user_id === userId)
+      if (userExpired.length > 0) {
+        const ids = userExpired.map((t) => t.id)
+        await supabase.from("tasks").update({ is_archived: true }).in("id", ids)
+        archiveCount += userExpired.length
+
+        // Send email notification for auto-archived tasks
+        if (transporter && user.email) {
+          const archiveListHtml = userExpired
+            .map((t) => {
+              const emoji = t.priority === "high" ? "🔴" : t.priority === "medium" ? "🟡" : "⚪"
+              return `<li>${emoji} <strong>${t.title}</strong></li>`
+            })
+            .join("")
+
+          try {
+            await transporter.sendMail({
+              from: `"Planigo" <${process.env.SMTP_USER || FROM_EMAIL}>`,
+              to: user.email,
+              subject: `📦 ${userExpired.length} tâche(s) archivée(s) automatiquement — Planigo`,
+              html: `
+                <div style="font-family:'Segoe UI',sans-serif;max-width:520px;margin:0 auto;background:#0c0c10;color:#e5e7eb;border-radius:16px;overflow:hidden">
+                  <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:24px;text-align:center">
+                    <h1 style="color:white;margin:0;font-size:22px">📦 Archivage automatique</h1>
+                  </div>
+                  <div style="padding:24px">
+                    <p style="color:#9ca3af;font-size:14px">Les tâches suivantes ont dépassé leur échéance et ont été archivées automatiquement :</p>
+                    <ul style="color:#e5e7eb;font-size:14px;line-height:2;padding-left:20px">${archiveListHtml}</ul>
+                    <p style="color:#9ca3af;font-size:12px;margin-top:16px">Vous pouvez retrouver vos tâches archivées dans la section Archives de Planigo.</p>
+                    <p style="color:#6b7280;font-size:11px;text-align:center;margin:20px 0 0">
+                      Pour désactiver cette notification, rendez-vous dans votre profil Planigo.
+                    </p>
+                  </div>
+                </div>
+              `,
+            })
+            emailCount++
+          } catch (err) {
+            console.error(`[Archive] Failed to email ${user.email}:`, (err as Error).message)
+          }
+        }
+      }
+    }
+
+    // ── Reminder notifications for upcoming deadlines ──
+    if (notificationsEnabled && remindersByUser[userId]) {
+      const userTasks = remindersByUser[userId]
+
+      // Check which tasks already have a recent reminder (avoid duplicates)
+      const taskIds = userTasks.map((t) => t.id)
+      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
+      const { data: existing } = await supabase
+        .from("notifications")
+        .select("task_id")
+        .eq("user_id", userId)
+        .eq("type", "reminder")
+        .in("task_id", taskIds)
+        .gte("created_at", oneDayAgo)
+
+      const alreadyNotified = new Set((existing ?? []).map((n) => n.task_id))
+      const newTasks = userTasks.filter((t) => !alreadyNotified.has(t.id))
+
+      if (newTasks.length > 0) {
+        const notifs = newTasks.map((t) => {
+          const hoursLeft = Math.round((new Date(t.due_date).getTime() - now.getTime()) / (1000 * 60 * 60))
+          const label = hoursLeft <= 1 ? "< 1h" : `${hoursLeft}h`
+          return {
+            user_id: userId,
+            task_id: t.id,
+            type: "reminder",
+            title_fr: `Rappel : échéance dans ${label}`,
+            title_en: `Reminder: due in ${label}`,
+            message_fr: `"${t.title_fr || t.title}" arrive à échéance dans ${label}.`,
+            message_en: `"${t.title_en || t.title}" is due in ${label}.`,
+            is_read: false,
+          }
         })
-        const priorityEmoji = t.priority === "high" ? "🔴" : t.priority === "medium" ? "🟡" : "⚪"
-        return `<li>${priorityEmoji} <strong>${t.title}</strong> — ${date}</li>`
-      })
-      .join("")
+        await supabase.from("notifications").insert(notifs)
+      }
 
-    try {
-      await transporter.sendMail({
-        from: `"Planigo Rappels" <${process.env.SMTP_USER || FROM_EMAIL}>`,
-        to: userEmail,
-        subject: `⏰ ${userTasks.length} tâche(s) arrivent à échéance — Planigo`,
-        html: `
-          <div style="font-family:'Segoe UI',sans-serif;max-width:520px;margin:0 auto;background:#0c0c10;color:#e5e7eb;border-radius:16px;overflow:hidden">
-            <div style="background:linear-gradient(135deg,#f59e0b,#ef4444);padding:24px;text-align:center">
-              <h1 style="color:white;margin:0;font-size:22px">⏰ Rappel d'échéances</h1>
-            </div>
-            <div style="padding:24px">
-              <p style="color:#9ca3af;font-size:14px">Les tâches suivantes arrivent à échéance dans les prochaines 24h :</p>
-              <ul style="color:#e5e7eb;font-size:14px;line-height:2;padding-left:20px">${taskListHtml}</ul>
-              <p style="color:#6b7280;font-size:12px;text-align:center;margin:20px 0 0">
-                Planigo — © 2025 @skid | MIT License
-              </p>
-            </div>
-          </div>
-        `,
-      })
-      sentCount++
-    } catch (err) {
-      console.error(`[Deadlines] Failed to email ${userEmail}:`, (err as Error).message)
+      // ── Send email digest ──
+      if (transporter && user.email && newTasks.length > 0) {
+        const taskListHtml = newTasks
+          .map((t) => {
+            const date = new Date(t.due_date).toLocaleString("fr-FR", {
+              day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+            })
+            const emoji = t.priority === "high" ? "🔴" : t.priority === "medium" ? "🟡" : "⚪"
+            return `<li>${emoji} <strong>${t.title}</strong> — ${date}</li>`
+          })
+          .join("")
+
+        try {
+          await transporter.sendMail({
+            from: `"Planigo Rappels" <${process.env.SMTP_USER || FROM_EMAIL}>`,
+            to: user.email,
+            subject: `⏰ ${newTasks.length} tâche(s) arrivent à échéance — Planigo`,
+            html: `
+              <div style="font-family:'Segoe UI',sans-serif;max-width:520px;margin:0 auto;background:#0c0c10;color:#e5e7eb;border-radius:16px;overflow:hidden">
+                <div style="background:linear-gradient(135deg,#f59e0b,#ef4444);padding:24px;text-align:center">
+                  <h1 style="color:white;margin:0;font-size:22px">⏰ Rappel d'échéances</h1>
+                </div>
+                <div style="padding:24px">
+                  <p style="color:#9ca3af;font-size:14px">Les tâches suivantes arrivent à échéance bientôt :</p>
+                  <ul style="color:#e5e7eb;font-size:14px;line-height:2;padding-left:20px">${taskListHtml}</ul>
+                  <p style="color:#6b7280;font-size:12px;text-align:center;margin:20px 0 0">
+                    Planigo — © 2025 @skid | MIT License
+                  </p>
+                </div>
+              </div>
+            `,
+          })
+          emailCount++
+        } catch (err) {
+          console.error(`[Deadlines] Failed to email ${user.email}:`, (err as Error).message)
+        }
+      }
     }
   }
 
-  return NextResponse.json({ sent: sentCount, tasksFound: tasks.length })
+  return NextResponse.json({
+    tasks_archived: archiveCount,
+    emails_sent: emailCount,
+    tasks_checked: (tasks ?? []).length,
+  })
 }
 

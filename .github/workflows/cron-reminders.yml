@@ -1,0 +1,23 @@
+name: Task Reminder Cron
+
+on:
+  schedule:
+    # Runs every 6 hours: midnight, 6h, 12h, 18h (UTC)
+    - cron: "0 */6 * * *"
+  workflow_dispatch: # Manual trigger for testing
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call notify-deadlines endpoint
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/notify-deadlines")
+          echo "HTTP status: $response"
+          if [ "$response" != "200" ]; then
+            echo "::error::Endpoint returned $response"
+            exit 1
+          fi
+

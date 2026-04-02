@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import { useTranslation, type TranslationKey } from "@/lib/i18n"
 
-const FAQ_KEYS = ["q1", "q2", "q3", "q4", "q5", "q6"] as const
+const FAQ_KEYS = ["q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8"] as const
 
 export default function FAQPage() {
   const { t } = useTranslation()

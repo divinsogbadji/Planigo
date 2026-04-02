@@ -60,3 +60,20 @@ export interface TaskGroup {
   isCollapsed: boolean
 }
 
+/** Notification types */
+export type NotificationType = "reminder" | "auto_archive"
+
+/** Row from the `notifications` table */
+export interface Notification {
+  id: string
+  user_id: string
+  task_id: string | null
+  type: NotificationType
+  title_fr: string
+  title_en: string
+  message_fr: string
+  message_en: string
+  is_read: boolean
+  created_at: string
+}
+
