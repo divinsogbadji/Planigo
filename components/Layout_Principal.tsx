@@ -10,7 +10,7 @@ import { AISuggestDialog } from "@/components/AISuggestDialog"
 import { useToast } from "@/components/Toast"
 import { useTranslation } from "@/lib/i18n"
 import Link from "next/link"
-import { Archive, Send, Loader2, MessageSquare, ChevronDown, X, Sparkles, CheckSquare, Pencil } from "lucide-react"
+import { Archive, Send, Loader2, MessageSquare, ChevronDown, X, Sparkles, CheckSquare, Pencil, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
@@ -45,9 +45,14 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
   const [renameValue, setRenameValue] = useState("")
 
   const isArchiveView = activeNav === "archived"
+  const isTrashView = activeNav === "trash"
 
   // ── Filter tasks based on sidebar state ──
   const filteredTasks = tasks.filter((t) => {
+    // Trash view: show only soft-deleted tasks
+    if (isTrashView) return t.deleted_at != null
+    // All other views: hide soft-deleted tasks
+    if (t.deleted_at) return false
     // Archive view: show only archived tasks
     if (isArchiveView) return t.is_archived === true
     // Normal views: hide archived tasks
@@ -141,14 +146,48 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
   }, [supabase, toast])
 
   const handleDelete = useCallback(async (taskId: string) => {
+    // Soft-delete: move to trash by setting deleted_at
+    const { error } = await supabase.from("tasks").update({ deleted_at: new Date().toISOString() }).eq("id", taskId)
+    if (error) {
+      toast("error", t("toast.failedTrash") + ": " + error.message)
+    } else {
+      setTasks((prev) => prev.map((tk) => (tk.id === taskId ? { ...tk, deleted_at: new Date().toISOString() } : tk)))
+      toast("success", t("toast.taskTrashed"))
+    }
+  }, [supabase, toast])
+
+  // ── Trash: permanent delete, restore, empty ──
+  const handlePermanentDelete = useCallback(async (taskId: string) => {
     const { error } = await supabase.from("tasks").delete().eq("id", taskId)
     if (error) {
       toast("error", t("toast.failedDelete") + ": " + error.message)
     } else {
-      setTasks((prev) => prev.filter((t) => t.id !== taskId))
+      setTasks((prev) => prev.filter((tk) => tk.id !== taskId))
       toast("success", t("toast.taskDeleted"))
     }
   }, [supabase, toast])
+
+  const handleRestoreFromTrash = useCallback(async (taskId: string) => {
+    const { error } = await supabase.from("tasks").update({ deleted_at: null }).eq("id", taskId)
+    if (error) {
+      toast("error", t("toast.failedRestore") + ": " + error.message)
+    } else {
+      setTasks((prev) => prev.map((tk) => (tk.id === taskId ? { ...tk, deleted_at: null } : tk)))
+      toast("success", t("toast.taskRestoredFromTrash"))
+    }
+  }, [supabase, toast])
+
+  const handleEmptyTrash = useCallback(async () => {
+    const trashIds = tasks.filter((tk) => tk.deleted_at != null).map((tk) => tk.id)
+    if (trashIds.length === 0) return
+    const { error } = await supabase.from("tasks").delete().in("id", trashIds)
+    if (error) {
+      toast("error", t("toast.failedDelete") + ": " + error.message)
+    } else {
+      setTasks((prev) => prev.filter((tk) => tk.deleted_at == null))
+      toast("success", t("toast.trashEmptied"))
+    }
+  }, [supabase, tasks, toast])
 
   // ── Archive / Restore ──
   const handleArchive = useCallback(async (taskId: string) => {
@@ -373,10 +412,10 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
       />
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Topbar onNewTask={openNew} onSuggestPlan={() => setAiDialogOpen(true)} tasks={tasks.filter((tk) => !tk.is_archived)} onSelectTask={openEdit} />
+        <Topbar onNewTask={openNew} onSuggestPlan={() => setAiDialogOpen(true)} tasks={tasks.filter((tk) => !tk.is_archived && !tk.deleted_at)} onSelectTask={openEdit} />
 
         <main className="flex-1 space-y-6 overflow-y-auto p-6">
-          {!isArchiveView && <CalendarView tasks={tasks.filter(tk => !tk.is_archived)} onReschedule={handleReschedule} />}
+          {!isArchiveView && !isTrashView && <CalendarView tasks={tasks.filter(tk => !tk.is_archived && !tk.deleted_at)} onReschedule={handleReschedule} />}
           {isArchiveView && (() => {
             const now = new Date()
             const expiredTasks = filteredTasks.filter((tk) => tk.due_date && new Date(tk.due_date) < now)
@@ -391,7 +430,7 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
                 </div>
                 {sectionTasks.length > 0 ? (
                   <div className="p-4">
-                    <TaskList tasks={sectionTasks} onDeleteTask={handleDelete} onRestoreTask={handleRestore} isArchiveView />
+                    <TaskList tasks={sectionTasks} onEditTask={openEdit} onDeleteTask={handleDelete} onRestoreTask={handleRestore} onStatusChange={handleStatusChange} isArchiveView />
                   </div>
                 ) : (
                   <p className="px-4 py-6 text-center text-sm text-muted-foreground">{t("archive.empty")}</p>
@@ -412,8 +451,64 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
             )
           })()}
 
+          {/* ── Trash view ── */}
+          {isTrashView && (
+            <>
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                  <Trash2 className="size-5 text-red-400" />
+                  <h2 className="text-lg font-semibold text-white">{t("trash.title")}</h2>
+                  <span className="ml-2 text-sm text-muted-foreground">({filteredTasks.length})</span>
+                </div>
+                {filteredTasks.length > 0 && (
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={handleEmptyTrash} className="text-red-400 hover:text-red-300 hover:bg-red-500/10 border-red-500/20">
+                      <Trash2 className="mr-1 size-3.5" />{t("trash.emptyAction")}
+                    </Button>
+                  </div>
+                )}
+              </div>
+              <p className="px-1 text-xs text-muted-foreground">{t("trash.autoDeleteNotice")}</p>
+              {filteredTasks.length > 0 ? (
+                <div className="glass-card rounded-xl shadow-3d overflow-hidden animate-fade-up p-4">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                    {filteredTasks.map((tk) => {
+                      const displayTitle = (locale === "fr" ? tk.title_fr : tk.title_en) || tk.title
+                      const daysAgo = tk.deleted_at ? Math.floor((Date.now() - new Date(tk.deleted_at).getTime()) / (1000 * 60 * 60 * 24)) : 0
+                      return (
+                        <div key={tk.id} className="glass-card rounded-xl p-4 animate-fade-up">
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <h3 className="text-sm font-semibold text-white/60 line-through flex-1">{displayTitle}</h3>
+                            <div className="flex shrink-0 gap-0.5">
+                              <Button variant="ghost" size="icon-xs" onClick={() => handleRestoreFromTrash(tk.id)} className="text-muted-foreground hover:text-emerald-400" title={t("task.restore")}>
+                                <Archive className="size-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="icon-xs" onClick={() => handlePermanentDelete(tk.id)} className="text-muted-foreground hover:text-red-400" title={t("task.deletePermanently")}>
+                                <Trash2 className="size-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">
+                            {daysAgo === 0 ? (locale === "fr" ? "Aujourd'hui" : "Today") : `${daysAgo}${locale === "fr" ? "j" : "d"}`}
+                            {" · "}
+                            {t(`cat.${tk.category}` as "cat.personal")} · {t(`priority.${tk.priority}` as "priority.low")}
+                          </p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="glass-card rounded-xl p-12 text-center">
+                  <Trash2 className="mx-auto mb-3 size-10 text-muted-foreground/30" />
+                  <p className="text-sm text-muted-foreground">{t("trash.empty")}</p>
+                </div>
+              )}
+            </>
+          )}
+
           {/* ── Selection mode toggle ── */}
-          {!isArchiveView && (
+          {!isArchiveView && !isTrashView && (
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
@@ -433,7 +528,7 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
           )}
 
           {/* ── Task Groups (collapsible cards) ── */}
-          {!isArchiveView && groups.map((group) => {
+          {!isArchiveView && !isTrashView && groups.map((group) => {
             // Check against ALL non-archived tasks so the group stays visible even when filters narrow the view
             const allGroupTasks = tasks.filter((tk) => !tk.is_archived && group.taskIds.includes(tk.id))
             if (allGroupTasks.length === 0) return null
@@ -493,7 +588,7 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
           })}
 
           {/* ── Ungrouped tasks (non-archive only) ── */}
-          {!isArchiveView && (
+          {!isArchiveView && !isTrashView && (
             <TaskList
               tasks={ungroupedTasks}
               onEditTask={selectionMode ? undefined : openEdit}

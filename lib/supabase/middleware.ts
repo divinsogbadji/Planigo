@@ -4,6 +4,10 @@ import { NextResponse, type NextRequest } from "next/server"
 // Routes that don't require authentication
 const publicRoutes = ["/login", "/signup", "/auth/callback", "/privacy", "/faq", "/api/"]
 
+// Maximum session inactivity: 3 days (in seconds)
+const MAX_INACTIVITY_SECONDS = 3 * 24 * 60 * 60 // 259200s = 3 days
+const ACTIVITY_COOKIE = "planigo_last_activity"
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
@@ -36,6 +40,35 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route))
+
+  // ── Inactivity timeout: force logout after 3 days of inactivity ──
+  if (user && !isPublicRoute) {
+    const lastActivity = request.cookies.get(ACTIVITY_COOKIE)?.value
+    const now = Math.floor(Date.now() / 1000)
+
+    if (lastActivity) {
+      const elapsed = now - Number(lastActivity)
+      if (elapsed > MAX_INACTIVITY_SECONDS) {
+        // Session expired due to inactivity — sign out and redirect
+        await supabase.auth.signOut()
+        const url = request.nextUrl.clone()
+        url.pathname = "/login"
+        url.searchParams.set("expired", "1")
+        const redirectResponse = NextResponse.redirect(url)
+        redirectResponse.cookies.delete(ACTIVITY_COOKIE)
+        return redirectResponse
+      }
+    }
+
+    // Update last activity timestamp
+    supabaseResponse.cookies.set(ACTIVITY_COOKIE, String(now), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: MAX_INACTIVITY_SECONDS,
+      path: "/",
+    })
+  }
 
   // If no user and trying to access a protected route → redirect to login
   if (!user && !isPublicRoute) {

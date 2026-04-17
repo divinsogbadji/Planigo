@@ -43,6 +43,7 @@ export async function GET(req: NextRequest) {
     .from("tasks")
     .select("id, title, title_fr, title_en, due_date, user_id, priority")
     .eq("is_archived", false)
+    .is("deleted_at", null)
     .neq("status", "done")
     .not("due_date", "is", null)
     .gte("due_date", now.toISOString())
@@ -72,9 +73,40 @@ export async function GET(req: NextRequest) {
     .from("tasks")
     .select("id, title, title_fr, title_en, user_id, due_date, priority")
     .eq("is_archived", false)
+    .is("deleted_at", null)
     .neq("status", "done")
     .not("due_date", "is", null)
     .lt("due_date", now.toISOString())
+
+  // ── 2b. AUTO-PURGE TRASH (30+ days old OR excess > 100) ──────────
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const { count: purgedCount } = await supabase
+    .from("tasks")
+    .delete({ count: "exact" })
+    .not("deleted_at", "is", null)
+    .lt("deleted_at", thirtyDaysAgo)
+
+  // Also enforce 100-item limit per user in trash
+  const { data: trashTasks } = await supabase
+    .from("tasks")
+    .select("id, user_id, deleted_at")
+    .not("deleted_at", "is", null)
+    .order("deleted_at", { ascending: true })
+
+  if (trashTasks && trashTasks.length > 0) {
+    const trashByUser: Record<string, typeof trashTasks> = {}
+    for (const t of trashTasks) {
+      if (!trashByUser[t.user_id]) trashByUser[t.user_id] = []
+      trashByUser[t.user_id].push(t)
+    }
+    for (const [, userTrash] of Object.entries(trashByUser)) {
+      if (userTrash.length > 100) {
+        const excess = userTrash.slice(0, userTrash.length - 100)
+        const ids = excess.map((t) => t.id)
+        await supabase.from("tasks").delete().in("id", ids)
+      }
+    }
+  }
 
   // ── 3. PROCESS PER USER ───────────────────────────────────────────
   // Collect all unique user IDs
@@ -233,6 +265,7 @@ export async function GET(req: NextRequest) {
     tasks_archived: archiveCount,
     emails_sent: emailCount,
     tasks_checked: (tasks ?? []).length,
+    trash_purged: purgedCount ?? 0,
   })
 }
 

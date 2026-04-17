@@ -1,11 +1,11 @@
 "use client"
 import { useState } from "react"
 import Link from "next/link"
-import { Archive, CalendarDays, CalendarRange, Globe, ListTodo, User, Briefcase, GraduationCap, Plane, Heart, Wallet, Palette, Sparkles, LogOut, ArrowDown, ArrowRight, ArrowUp, Filter, UserCog, ChevronDown } from "lucide-react"
+import { Archive, CalendarDays, CalendarRange, Globe, ListTodo, User, Briefcase, GraduationCap, Plane, Heart, Wallet, Palette, Sparkles, LogOut, ArrowDown, ArrowRight, ArrowUp, Filter, UserCog, ChevronDown, Trash2 } from "lucide-react"
 import { logout } from "@/app/(auth)/actions"
 import { useTranslation } from "@/lib/i18n"
 
-export type NavItem = "today" | "week" | "all" | "archived"
+export type NavItem = "today" | "week" | "all" | "archived" | "trash"
 export type CategoryFilter = "all" | "personal" | "work" | "study" | "travel" | "health" | "finance" | "hobby"
 export type PriorityFilter = "all" | "low" | "medium" | "high"
 
@@ -18,11 +18,12 @@ interface SidebarProps {
   onPriorityChange?: (p: PriorityFilter) => void
 }
 
-const navKeys: { key: NavItem; tKey: "nav.today" | "nav.week" | "nav.allTasks" | "nav.archived"; icon: React.ElementType }[] = [
+const navKeys: { key: NavItem; tKey: "nav.today" | "nav.week" | "nav.allTasks" | "nav.archived" | "nav.trash"; icon: React.ElementType }[] = [
   { key: "today", tKey: "nav.today", icon: CalendarDays },
   { key: "week", tKey: "nav.week", icon: CalendarRange },
   { key: "all", tKey: "nav.allTasks", icon: ListTodo },
   { key: "archived", tKey: "nav.archived", icon: Archive },
+  { key: "trash", tKey: "nav.trash", icon: Trash2 },
 ]
 
 const prioKeys: { key: PriorityFilter; tKey: "priority.all" | "priority.low" | "priority.medium" | "priority.high"; icon: React.ElementType; color: string }[] = [

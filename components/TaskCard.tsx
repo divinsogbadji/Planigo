@@ -52,7 +52,7 @@ export function TaskCard({ task, onEdit, onDelete, onArchive, onRestore, isArchi
 
   return (
     <div
-      draggable={!isArchiveView}
+      draggable
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", task.id)
         e.dataTransfer.effectAllowed = "move"
@@ -75,6 +75,9 @@ export function TaskCard({ task, onEdit, onDelete, onArchive, onRestore, isArchi
         <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
           {isArchiveView ? (
             <>
+              <Button variant="ghost" size="icon-xs" onClick={() => onEdit?.(task)} className="text-muted-foreground hover:text-white" title={t("task.edit")}>
+                <Pencil />
+              </Button>
               <Button variant="ghost" size="icon-xs" onClick={() => onRestore?.(task.id)} className="text-muted-foreground hover:text-emerald-400" title={t("task.restore")}>
                 <RotateCcw />
               </Button>

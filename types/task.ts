@@ -26,11 +26,12 @@ export interface Task {
   duration: string | null
   priority: Priority
   is_archived: boolean         // true = archived (hidden from main view)
+  deleted_at: string | null    // ISO-8601 timestamp — soft-delete (null = not deleted)
   created_at: string           // ISO-8601 timestamp
 }
 
 /** Payload for creating a new task (server fills id, user_id, created_at; is_archived defaults to false; bilingual fields are populated automatically) */
-export type TaskInsert = Omit<Task, "id" | "user_id" | "created_at" | "is_archived" | "title_fr" | "title_en" | "description_fr" | "description_en">
+export type TaskInsert = Omit<Task, "id" | "user_id" | "created_at" | "is_archived" | "deleted_at" | "title_fr" | "title_en" | "description_fr" | "description_en">
 
 /** Payload for updating a task (all fields optional except id) */
 export type TaskUpdate = Partial<TaskInsert> & { id: string }
