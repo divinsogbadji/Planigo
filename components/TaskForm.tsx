@@ -16,6 +16,8 @@ interface TaskFormProps {
   onOpenChange: (open: boolean) => void
   task?: Task | null
   onSubmit: (data: TaskInsert | (TaskInsert & { id: string })) => void
+  /** Read-only mode: only the status field is editable (used for archive/trash details) */
+  readOnly?: boolean
 }
 
 interface FieldErrors {
@@ -39,7 +41,7 @@ const defaultValues: TaskInsert = {
 
 const durationRegex = /^[0-9]+[mhd]?$/i
 
-export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) {
+export function TaskForm({ open, onOpenChange, task, onSubmit, readOnly = false }: TaskFormProps) {
   const isEditing = !!task
   const { t } = useTranslation()
   const [form, setForm] = useState<TaskInsert>(defaultValues)
@@ -116,6 +118,18 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+
+    // Read-only mode: only submit the status update
+    if (readOnly && task) {
+      onSubmit({ ...form, id: task.id, status: form.status })
+      setSuccessMsg(t("form.statusUpdated"))
+      setTimeout(() => {
+        setSuccessMsg(null)
+        onOpenChange(false)
+      }, 1200)
+      return
+    }
+
     const errs = validate(form)
     setErrors(errs)
     setTouched(new Set(["title", "description", "duration"]))
@@ -147,7 +161,7 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="glass border-white/10 sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-white">{isEditing ? t("form.editTask") : t("form.newTask")}</DialogTitle>
+          <DialogTitle className="text-white">{readOnly ? t("form.taskDetails") : isEditing ? t("form.editTask") : t("form.newTask")}</DialogTitle>
         </DialogHeader>
 
         {successMsg ? (
@@ -159,6 +173,11 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
+            {readOnly && (
+              <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+                {t("form.readOnlyHint")}
+              </p>
+            )}
             <div className="space-y-2">
               <Label htmlFor="title">{t("form.title")} <span className="text-red-400">*</span></Label>
               <div className="relative">
@@ -170,6 +189,8 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
                   onBlur={() => handleBlur("title")}
                   aria-invalid={!!errors.title && touched.has("title")}
                   className={fieldClass("title")}
+                  readOnly={readOnly}
+                  disabled={readOnly}
                 />
                 {titleValid && (
                   <CheckCircle2 className="absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-emerald-400" />
@@ -187,6 +208,8 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
                 onChange={(e) => handleChange("description", e.target.value)}
                 onBlur={() => handleBlur("description")}
                 className={fieldClass("description")}
+                readOnly={readOnly}
+                disabled={readOnly}
               />
               <div className="flex justify-between">
                 {errors.description && touched.has("description") ? (
@@ -201,7 +224,7 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>{t("form.category")}</Label>
-                <Select value={form.category} onValueChange={(v) => handleChange("category", v)}>
+                <Select value={form.category} onValueChange={(v) => handleChange("category", v)} disabled={readOnly}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="personal">{t("cat.personal")}</SelectItem>
@@ -216,7 +239,7 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
               </div>
               <div className="space-y-2">
                 <Label>{t("form.priority")}</Label>
-                <Select value={form.priority} onValueChange={(v) => handleChange("priority", v)}>
+                <Select value={form.priority} onValueChange={(v) => handleChange("priority", v)} disabled={readOnly}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="low">{t("priority.low")}</SelectItem>
@@ -241,40 +264,42 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
               </div>
             )}
 
-            {/* Date mode selector */}
-            <div className="space-y-2">
-              <Label>{t("form.dateMode")}</Label>
-              <Select value={dateMode} onValueChange={(v) => {
-                const mode = v as DateMode
-                setDateMode(mode)
-                if (mode === "end_only") {
-                  setForm((f) => ({ ...f, start_date: null, duration: null }))
-                } else if (mode === "interval") {
-                  setForm((f) => ({ ...f, duration: null }))
-                }
-              }}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="end_only">{t("form.dateEndOnly")}</SelectItem>
-                  <SelectItem value="interval">{t("form.dateInterval")}</SelectItem>
-                  <SelectItem value="with_duration">{t("form.dateWithDuration")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Date mode selector — hidden in read-only */}
+            {!readOnly && (
+              <div className="space-y-2">
+                <Label>{t("form.dateMode")}</Label>
+                <Select value={dateMode} onValueChange={(v) => {
+                  const mode = v as DateMode
+                  setDateMode(mode)
+                  if (mode === "end_only") {
+                    setForm((f) => ({ ...f, start_date: null, duration: null }))
+                  } else if (mode === "interval") {
+                    setForm((f) => ({ ...f, duration: null }))
+                  }
+                }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="end_only">{t("form.dateEndOnly")}</SelectItem>
+                    <SelectItem value="interval">{t("form.dateInterval")}</SelectItem>
+                    <SelectItem value="with_duration">{t("form.dateWithDuration")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               {/* Start date — shown for interval & with_duration */}
               {(dateMode === "interval" || dateMode === "with_duration") && (
                 <div className="space-y-2">
                   <Label htmlFor="start_date">{t("form.startDate")}</Label>
-                  <Input id="start_date" type="datetime-local" value={form.start_date ?? ""} onChange={(e) => handleChange("start_date", e.target.value || null)} />
+                  <Input id="start_date" type="datetime-local" value={form.start_date ?? ""} onChange={(e) => handleChange("start_date", e.target.value || null)} readOnly={readOnly} disabled={readOnly} />
                 </div>
               )}
 
               {/* End / due date — always shown */}
               <div className="space-y-2">
                 <Label htmlFor="due_date">{dateMode === "end_only" ? t("form.dueDate") : t("form.endDate")}</Label>
-                <Input id="due_date" type="datetime-local" value={form.due_date ?? ""} onChange={(e) => handleChange("due_date", e.target.value || null)} />
+                <Input id="due_date" type="datetime-local" value={form.due_date ?? ""} onChange={(e) => handleChange("due_date", e.target.value || null)} readOnly={readOnly} disabled={readOnly} />
               </div>
 
               {/* Duration — only for with_duration mode */}
@@ -288,6 +313,8 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
                     onChange={(e) => handleChange("duration", e.target.value || null)}
                     onBlur={() => handleBlur("duration")}
                     className={fieldClass("duration")}
+                    readOnly={readOnly}
+                    disabled={readOnly}
                   />
                   {errors.duration && touched.has("duration") && <p className="text-xs text-red-400">{errors.duration}</p>}
                 </div>
@@ -295,9 +322,9 @@ export function TaskForm({ open, onOpenChange, task, onSubmit }: TaskFormProps) 
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>{t("form.cancel")}</Button>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>{readOnly ? t("form.close") : t("form.cancel")}</Button>
               <Button type="submit" className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-600 hover:to-purple-700">
-                {isEditing ? t("form.saveChanges") : t("form.createTask")}
+                {readOnly ? t("form.updateStatus") : isEditing ? t("form.saveChanges") : t("form.createTask")}
               </Button>
             </DialogFooter>
           </form>

@@ -10,10 +10,11 @@ import { AISuggestDialog } from "@/components/AISuggestDialog"
 import { useToast } from "@/components/Toast"
 import { useTranslation } from "@/lib/i18n"
 import Link from "next/link"
-import { Archive, Send, Loader2, MessageSquare, ChevronDown, X, Sparkles, CheckSquare, Pencil, Trash2 } from "lucide-react"
+import { Archive, Send, Loader2, MessageSquare, ChevronDown, X, Sparkles, CheckSquare, Pencil, Trash2, Lock, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { createClient } from "@/lib/supabase/client"
 import type { Task, TaskInsert, AISuggestedTask, TaskGroup } from "@/types/task"
 
@@ -43,6 +44,8 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState("")
+  // Confirmation dialog: either deleting a single trashed task or emptying the trash entirely
+  const [confirmAction, setConfirmAction] = useState<{ kind: "deleteOne"; taskId: string } | { kind: "emptyTrash" } | null>(null)
 
   const isArchiveView = activeNav === "archived"
   const isTrashView = activeNav === "trash"
@@ -106,9 +109,14 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: data.title, description: data.description || "", locale }),
       })
-        .then((res) => res.json())
+        .then(async (res) => {
+          if (!res.ok) return null
+          const ct = res.headers.get("content-type") || ""
+          if (!ct.includes("application/json")) return null
+          return res.json()
+        })
         .then(async (translated) => {
-          if (!translated.title) return
+          if (!translated || !translated.title) return
           const updateFields: Record<string, string> = {}
           if (locale === "fr") {
             updateFields.title_en = translated.title
@@ -462,7 +470,7 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
                 </div>
                 {filteredTasks.length > 0 && (
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={handleEmptyTrash} className="text-red-400 hover:text-red-300 hover:bg-red-500/10 border-red-500/20">
+                    <Button variant="outline" size="sm" onClick={() => setConfirmAction({ kind: "emptyTrash" })} className="text-red-400 hover:text-red-300 hover:bg-red-500/10 border-red-500/20">
                       <Trash2 className="mr-1 size-3.5" />{t("trash.emptyAction")}
                     </Button>
                   </div>
@@ -475,22 +483,33 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
                     {filteredTasks.map((tk) => {
                       const displayTitle = (locale === "fr" ? tk.title_fr : tk.title_en) || tk.title
                       const daysAgo = tk.deleted_at ? Math.floor((Date.now() - new Date(tk.deleted_at).getTime()) / (1000 * 60 * 60 * 24)) : 0
+                      const daysLeft = Math.max(0, 30 - daysAgo)
+                      const purgeLabel = daysLeft === 0 ? t("trash.purgeToday") : t("trash.purgeIn", { days: daysLeft })
                       return (
                         <div key={tk.id} className="glass-card rounded-xl p-4 animate-fade-up">
                           <div className="flex items-start justify-between gap-2 mb-2">
-                            <h3 className="text-sm font-semibold text-white/60 line-through flex-1">{displayTitle}</h3>
+                            <button
+                              type="button"
+                              onClick={() => openEdit(tk)}
+                              className="text-sm font-semibold text-white/60 line-through flex-1 text-left hover:text-white/90 transition-colors flex items-center gap-1.5"
+                              title={t("form.taskDetails")}
+                            >
+                              <Lock className="size-3 text-red-400/70 shrink-0 no-underline" aria-label={t("common.readOnly")} />
+                              <span>{displayTitle}</span>
+                            </button>
                             <div className="flex shrink-0 gap-0.5">
                               <Button variant="ghost" size="icon-xs" onClick={() => handleRestoreFromTrash(tk.id)} className="text-muted-foreground hover:text-emerald-400" title={t("task.restore")}>
                                 <Archive className="size-3.5" />
                               </Button>
-                              <Button variant="ghost" size="icon-xs" onClick={() => handlePermanentDelete(tk.id)} className="text-muted-foreground hover:text-red-400" title={t("task.deletePermanently")}>
+                              <Button variant="ghost" size="icon-xs" onClick={() => setConfirmAction({ kind: "deleteOne", taskId: tk.id })} className="text-muted-foreground hover:text-red-400" title={t("task.deletePermanently")}>
                                 <Trash2 className="size-3.5" />
                               </Button>
                             </div>
                           </div>
-                          <p className="text-[10px] text-muted-foreground">
-                            {daysAgo === 0 ? (locale === "fr" ? "Aujourd'hui" : "Today") : `${daysAgo}${locale === "fr" ? "j" : "d"}`}
-                            {" · "}
+                          <p className={`text-[10px] ${daysLeft <= 3 ? "text-red-400" : "text-muted-foreground"}`}>
+                            {purgeLabel}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
                             {t(`cat.${tk.category}` as "cat.personal")} · {t(`priority.${tk.priority}` as "priority.low")}
                           </p>
                         </div>
@@ -661,8 +680,44 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
         </main>
       </div>
 
-      <TaskForm open={formOpen} onOpenChange={setFormOpen} task={editingTask} onSubmit={handleCreate} />
+      <TaskForm
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        task={editingTask}
+        onSubmit={handleCreate}
+        readOnly={!!editingTask && (editingTask.is_archived || !!editingTask.deleted_at)}
+      />
       <AISuggestDialog open={aiDialogOpen} onOpenChange={setAiDialogOpen} onConfirm={handleAIConfirm} />
+
+      {/* Confirmation dialog for destructive trash actions */}
+      <Dialog open={confirmAction !== null} onOpenChange={(o) => { if (!o) setConfirmAction(null) }}>
+        <DialogContent className="glass border-white/10 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <AlertTriangle className="size-5 text-red-400" />
+              {confirmAction?.kind === "emptyTrash" ? t("trash.emptyAction") : t("task.deletePermanently")}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground py-2">
+            {confirmAction?.kind === "emptyTrash" ? t("trash.emptyConfirm") : t("trash.deleteOneConfirm")}
+          </p>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setConfirmAction(null)}>{t("common.cancel")}</Button>
+            <Button
+              type="button"
+              className="bg-red-500 hover:bg-red-600 text-white"
+              onClick={async () => {
+                if (!confirmAction) return
+                if (confirmAction.kind === "deleteOne") await handlePermanentDelete(confirmAction.taskId)
+                else await handleEmptyTrash()
+                setConfirmAction(null)
+              }}
+            >
+              {t("common.confirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

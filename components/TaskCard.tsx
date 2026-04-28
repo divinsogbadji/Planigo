@@ -1,6 +1,6 @@
 "use client"
 
-import { Archive, Calendar, Clock, Pencil, RotateCcw, Trash2 } from "lucide-react"
+import { Archive, Calendar, Clock, Lock, Pencil, RotateCcw, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useTranslation } from "@/lib/i18n"
@@ -71,7 +71,10 @@ export function TaskCard({ task, onEdit, onDelete, onArchive, onRestore, isArchi
             {selected && <span className="text-[10px] text-white">✓</span>}
           </span>
         )}
-        <h3 className="text-sm font-semibold text-white leading-snug flex-1">{displayTitle}</h3>
+        <h3 className="text-sm font-semibold text-white leading-snug flex-1 flex items-center gap-1.5">
+          {isArchiveView && <Lock className="size-3 text-amber-400 shrink-0" aria-label={t("common.readOnly")} />}
+          <span>{displayTitle}</span>
+        </h3>
         <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
           {isArchiveView ? (
             <>

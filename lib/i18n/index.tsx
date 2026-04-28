@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react"
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
 import { translations, type Locale } from "./translations"
 
 type TranslationKey = keyof typeof translations.en
@@ -14,17 +14,20 @@ interface I18nContextValue {
 const I18nContext = createContext<I18nContextValue | null>(null)
 
 const STORAGE_KEY = "planigo-locale"
-
-function getInitialLocale(): Locale {
-  if (typeof window !== "undefined") {
-    const saved = localStorage.getItem(STORAGE_KEY) as Locale | null
-    if (saved && (saved === "en" || saved === "fr")) return saved
-  }
-  return "fr"
-}
+const DEFAULT_LOCALE: Locale = "fr"
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(getInitialLocale)
+  // Always start with the default locale on both server and first client render
+  // to avoid hydration mismatches. The real locale is loaded from localStorage
+  // in a useEffect after mount.
+  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE)
+
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY) as Locale | null
+    if (saved && (saved === "en" || saved === "fr") && saved !== DEFAULT_LOCALE) {
+      setLocaleState(saved)
+    }
+  }, [])
 
   const setLocale = useCallback((newLocale: Locale) => {
     setLocaleState(newLocale)
