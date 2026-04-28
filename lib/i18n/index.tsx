@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
+import { createContext, useContext, useCallback, useSyncExternalStore, type ReactNode } from "react"
 import { translations, type Locale } from "./translations"
 
 type TranslationKey = keyof typeof translations.en
@@ -16,22 +16,35 @@ const I18nContext = createContext<I18nContextValue | null>(null)
 const STORAGE_KEY = "planigo-locale"
 const DEFAULT_LOCALE: Locale = "fr"
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  // Always start with the default locale on both server and first client render
-  // to avoid hydration mismatches. The real locale is loaded from localStorage
-  // in a useEffect after mount.
-  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE)
+// External store backed by localStorage. Returning DEFAULT_LOCALE from
+// getServerSnapshot (and during the first client render) keeps SSR and hydration
+// in sync; React then re-renders with the real value after mount without us
+// calling setState inside an effect.
+const localeListeners = new Set<() => void>()
+function subscribeLocale(cb: () => void) {
+  localeListeners.add(cb)
+  const onStorage = (e: StorageEvent) => { if (e.key === STORAGE_KEY) cb() }
+  window.addEventListener("storage", onStorage)
+  return () => {
+    localeListeners.delete(cb)
+    window.removeEventListener("storage", onStorage)
+  }
+}
+function getLocaleSnapshot(): Locale {
+  const saved = localStorage.getItem(STORAGE_KEY) as Locale | null
+  if (saved === "en" || saved === "fr") return saved
+  return DEFAULT_LOCALE
+}
+function getLocaleServerSnapshot(): Locale {
+  return DEFAULT_LOCALE
+}
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY) as Locale | null
-    if (saved && (saved === "en" || saved === "fr") && saved !== DEFAULT_LOCALE) {
-      setLocaleState(saved)
-    }
-  }, [])
+export function I18nProvider({ children }: { children: ReactNode }) {
+  const locale = useSyncExternalStore(subscribeLocale, getLocaleSnapshot, getLocaleServerSnapshot)
 
   const setLocale = useCallback((newLocale: Locale) => {
-    setLocaleState(newLocale)
     localStorage.setItem(STORAGE_KEY, newLocale)
+    localeListeners.forEach((cb) => cb())
   }, [])
 
   const t = useCallback(
