@@ -4,8 +4,12 @@ import { NextResponse, type NextRequest } from "next/server"
 // Routes that don't require authentication
 const publicRoutes = ["/login", "/signup", "/auth/callback", "/privacy", "/faq", "/api/"]
 
-// Maximum session inactivity: 3 days (in seconds)
-const MAX_INACTIVITY_SECONDS = 3 * 24 * 60 * 60 // 259200s = 3 days
+// Maximum session inactivity: 8 hours (in seconds)
+const MAX_INACTIVITY_SECONDS = 8 * 60 * 60 // 28800s = 8 hours
+// Cookie lifetime must be much longer than the inactivity window so the
+// previous-activity timestamp survives until the next visit (otherwise the
+// cookie expires first, the timestamp is lost, and the inactivity check is silently skipped).
+const ACTIVITY_COOKIE_MAX_AGE = 60 * 60 * 24 * 30 // 30 days
 const ACTIVITY_COOKIE = "planigo_last_activity"
 
 export async function updateSession(request: NextRequest) {
@@ -41,7 +45,7 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route))
 
-  // ── Inactivity timeout: force logout after 3 days of inactivity ──
+  // ── Inactivity timeout: force logout after MAX_INACTIVITY_SECONDS ──
   if (user && !isPublicRoute) {
     const lastActivity = request.cookies.get(ACTIVITY_COOKIE)?.value
     const now = Math.floor(Date.now() / 1000)
@@ -49,12 +53,19 @@ export async function updateSession(request: NextRequest) {
     if (lastActivity) {
       const elapsed = now - Number(lastActivity)
       if (elapsed > MAX_INACTIVITY_SECONDS) {
-        // Session expired due to inactivity — sign out and redirect
+        // Session expired due to inactivity — sign out and redirect.
+        // signOut() writes "delete cookie" entries to supabaseResponse via the
+        // setAll callback above. We must carry those over to the redirect
+        // response, otherwise the Supabase auth cookies stay in the browser
+        // and the user remains logged in on the next request.
         await supabase.auth.signOut()
         const url = request.nextUrl.clone()
         url.pathname = "/login"
         url.searchParams.set("expired", "1")
         const redirectResponse = NextResponse.redirect(url)
+        for (const cookie of supabaseResponse.cookies.getAll()) {
+          redirectResponse.cookies.set(cookie)
+        }
         redirectResponse.cookies.delete(ACTIVITY_COOKIE)
         return redirectResponse
       }
@@ -65,7 +76,7 @@ export async function updateSession(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: MAX_INACTIVITY_SECONDS,
+      maxAge: ACTIVITY_COOKIE_MAX_AGE,
       path: "/",
     })
   }

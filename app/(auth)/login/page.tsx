@@ -28,6 +28,7 @@ function LoginForm() {
   const searchParams = useSearchParams()
   const serverError = searchParams.get("error")
   const serverMessage = searchParams.get("message")
+  const sessionExpired = searchParams.get("expired") === "1"
   const { t } = useTranslation()
 
   const [errors, setErrors] = useState<FieldErrors>({})
@@ -71,6 +72,12 @@ function LoginForm() {
           <CardDescription>{t("login.subtitle")}</CardDescription>
         </CardHeader>
         <CardContent>
+          {sessionExpired && (
+            <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
+              <AlertTriangle className="size-4 shrink-0" />
+              {t("login.sessionExpired")}
+            </div>
+          )}
           {serverError && (
             <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
               <AlertTriangle className="size-4 shrink-0" />

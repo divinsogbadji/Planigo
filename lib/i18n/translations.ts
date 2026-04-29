@@ -133,6 +133,7 @@ export const translations = {
     "login.signIn": "Sign in",
     "login.noAccount": "Don't have an account?",
     "login.signUp": "Sign up",
+    "login.sessionExpired": "Your session expired due to inactivity. Please sign in again.",
     // Auth - Signup
     "signup.firstName": "First Name",
     "signup.lastName": "Last Name",
@@ -437,6 +438,7 @@ export const translations = {
     "login.signIn": "Se connecter",
     "login.noAccount": "Pas encore de compte ?",
     "login.signUp": "S'inscrire",
+    "login.sessionExpired": "Votre session a expiré pour cause d'inactivité. Veuillez vous reconnecter.",
     // Auth - Signup
     "signup.firstName": "Prénom",
     "signup.lastName": "Nom",
