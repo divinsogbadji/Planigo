@@ -29,6 +29,10 @@ function LoginForm() {
   const serverError = searchParams.get("error")
   const serverMessage = searchParams.get("message")
   const sessionExpired = searchParams.get("expired") === "1"
+  // Post-login redirect target (set by the middleware when a logged-out user
+  // tries to open a deep link such as /?openTask=<id> from an email).
+  const nextRaw = searchParams.get("next") ?? ""
+  const nextPath = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : ""
   const { t } = useTranslation()
 
   const [errors, setErrors] = useState<FieldErrors>({})
@@ -92,6 +96,7 @@ function LoginForm() {
           )}
 
           <form action={handleSubmit} className="space-y-4">
+            {nextPath && <input type="hidden" name="next" value={nextPath} />}
             <div className="space-y-2">
               <Label htmlFor="email">{t("login.email")}</Label>
               <Input

@@ -12,14 +12,21 @@ export async function login(formData: FormData) {
     password: formData.get("password") as string,
   }
 
+  // Optional post-login destination (forwarded from the login form when arriving
+  // from an email deep-link). Restricted to relative paths to prevent open redirects.
+  const nextRaw = (formData.get("next") as string | null)?.trim() ?? ""
+  const nextPath = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/"
+
   const { error } = await supabase.auth.signInWithPassword(data)
 
   if (error) {
-    redirect("/login?error=" + encodeURIComponent(error.message))
+    const params = new URLSearchParams({ error: error.message })
+    if (nextPath !== "/") params.set("next", nextPath)
+    redirect("/login?" + params.toString())
   }
 
   revalidatePath("/", "layout")
-  redirect("/")
+  redirect(nextPath)
 }
 
 export async function signup(formData: FormData) {

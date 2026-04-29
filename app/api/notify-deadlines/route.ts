@@ -38,6 +38,10 @@ export async function GET(req: NextRequest) {
   const now = new Date()
   const maxWindow = new Date(now.getTime() + 48 * 60 * 60 * 1000) // 48h max window
 
+  // Base URL used to build deep links inside emails. APP_URL must be set on
+  // Vercel; we fall back to localhost for safety in case it is missing.
+  const appUrl = (process.env.APP_URL || "http://localhost:3000").replace(/\/+$/, "")
+
   // ── 1. REMINDER NOTIFICATIONS ──────────────────────────────────────
   const { data: tasks, error } = await supabase
     .from("tasks")
@@ -152,9 +156,11 @@ export async function GET(req: NextRequest) {
           const archiveListHtml = userExpired
             .map((t) => {
               const emoji = t.priority === "high" ? "🔴" : t.priority === "medium" ? "🟡" : "⚪"
-              return `<li>${emoji} <strong>${t.title}</strong></li>`
+              const link = `${appUrl}/?openTask=${t.id}&view=archive`
+              return `<li>${emoji} <a href="${link}" style="color:#a78bfa;text-decoration:none;font-weight:600">${t.title}</a></li>`
             })
             .join("")
+          const archiveSectionUrl = `${appUrl}/?view=archive`
 
           try {
             await transporter.sendMail({
@@ -169,7 +175,9 @@ export async function GET(req: NextRequest) {
                   <div style="padding:24px">
                     <p style="color:#9ca3af;font-size:14px">Les tâches suivantes ont dépassé leur échéance et ont été archivées automatiquement :</p>
                     <ul style="color:#e5e7eb;font-size:14px;line-height:2;padding-left:20px">${archiveListHtml}</ul>
-                    <p style="color:#9ca3af;font-size:12px;margin-top:16px">Vous pouvez retrouver vos tâches archivées dans la section Archives de Planigo.</p>
+                    <p style="text-align:center;margin:20px 0 8px">
+                      <a href="${archiveSectionUrl}" style="display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600">Voir mes archives</a>
+                    </p>
                     <p style="color:#6b7280;font-size:11px;text-align:center;margin:20px 0 0">
                       Pour désactiver cette notification, rendez-vous dans votre profil Planigo.
                     </p>
@@ -229,7 +237,8 @@ export async function GET(req: NextRequest) {
               day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
             })
             const emoji = t.priority === "high" ? "🔴" : t.priority === "medium" ? "🟡" : "⚪"
-            return `<li>${emoji} <strong>${t.title}</strong> — ${date}</li>`
+            const link = `${appUrl}/?openTask=${t.id}`
+            return `<li>${emoji} <a href="${link}" style="color:#fbbf24;text-decoration:none;font-weight:600">${t.title}</a> — ${date}</li>`
           })
           .join("")
 
@@ -246,6 +255,9 @@ export async function GET(req: NextRequest) {
                 <div style="padding:24px">
                   <p style="color:#9ca3af;font-size:14px">Les tâches suivantes arrivent à échéance bientôt :</p>
                   <ul style="color:#e5e7eb;font-size:14px;line-height:2;padding-left:20px">${taskListHtml}</ul>
+                  <p style="text-align:center;margin:20px 0 8px">
+                    <a href="${appUrl}/" style="display:inline-block;background:linear-gradient(135deg,#f59e0b,#ef4444);color:white;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600">Ouvrir Planigo</a>
+                  </p>
                   <p style="color:#6b7280;font-size:12px;text-align:center;margin:20px 0 0">
                     Planigo — © 2025 @skid | MIT License
                   </p>

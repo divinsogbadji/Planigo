@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Sidebar, type NavItem, type CategoryFilter, type PriorityFilter } from "@/components/Sidebar"
 import { Topbar } from "@/components/topbar"
 import { CalendarView } from "@/components/CalendarView"
@@ -21,17 +22,29 @@ import type { Task, TaskInsert, AISuggestedTask, TaskGroup } from "@/types/task"
 interface DashboardProps {
   initialTasks: Task[]
   userId: string
+  /** Deep-link target: when present, automatically opens the matching task modal on mount. */
+  initialOpenTaskId?: string
+  /** Deep-link view: "archive" | "trash" — switches the sidebar to the matching section on mount. */
+  initialView?: string
 }
 
-export default function Dashboard({ initialTasks, userId }: DashboardProps) {
+export default function Dashboard({ initialTasks, userId, initialOpenTaskId, initialView }: DashboardProps) {
   const supabase = createClient()
+  const router = useRouter()
   const { toast } = useToast()
   const { t, locale } = useTranslation()
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
-  const [formOpen, setFormOpen] = useState(false)
-  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  // Resolve initial nav from the URL ?view= deep-link
+  const initialNav: NavItem =
+    initialView === "archive" ? "archived" : initialView === "trash" ? "trash" : "all"
+  // Resolve initial editing task from the URL ?openTask= deep-link
+  const initialEditingTask = initialOpenTaskId
+    ? initialTasks.find((tk) => tk.id === initialOpenTaskId) ?? null
+    : null
+  const [formOpen, setFormOpen] = useState(initialEditingTask !== null)
+  const [editingTask, setEditingTask] = useState<Task | null>(initialEditingTask)
   const [aiDialogOpen, setAiDialogOpen] = useState(false)
-  const [activeNav, setActiveNav] = useState<NavItem>("all")
+  const [activeNav, setActiveNav] = useState<NavItem>(initialNav)
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>("all")
   const [activePriority, setActivePriority] = useState<PriorityFilter>("all")
   const [feedbackMsg, setFeedbackMsg] = useState("")
@@ -46,6 +59,17 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
   const [renameValue, setRenameValue] = useState("")
   // Confirmation dialog: either deleting a single trashed task or emptying the trash entirely
   const [confirmAction, setConfirmAction] = useState<{ kind: "deleteOne"; taskId: string } | { kind: "emptyTrash" } | null>(null)
+
+  // ── Clean deep-link query params from the URL after consumption ──
+  // Once we've used initialOpenTaskId / initialView to set the initial state,
+  // strip them from the address bar so a refresh doesn't keep re-opening the modal.
+  useEffect(() => {
+    if (initialOpenTaskId || initialView) {
+      router.replace("/")
+    }
+    // Intentionally only on mount: deep-link params are a first-render concern.
+
+  }, [])
 
   const isArchiveView = activeNav === "archived"
   const isTrashView = activeNav === "trash"

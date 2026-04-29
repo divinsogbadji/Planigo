@@ -81,17 +81,30 @@ export async function updateSession(request: NextRequest) {
     })
   }
 
-  // If no user and trying to access a protected route → redirect to login
+  // If no user and trying to access a protected route → redirect to login,
+  // preserving the original path + query so we can send the user back after sign-in
+  // (this is what enables deep-links from email reminders to land on the right task).
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = "/login"
+    url.search = ""
+    const target = pathname + (request.nextUrl.search || "")
+    if (target && target !== "/") {
+      url.searchParams.set("next", target)
+    }
     return NextResponse.redirect(url)
   }
 
-  // If logged in and trying to access login/signup → redirect to home
+  // If logged in and trying to access login/signup → redirect to home (or to ?next= if present)
   if (user && isPublicRoute && pathname !== "/auth/callback") {
     const url = request.nextUrl.clone()
+    const nextParam = request.nextUrl.searchParams.get("next")
+    // Only honor relative paths to avoid open-redirect vulnerabilities
+    if (nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")) {
+      return NextResponse.redirect(new URL(nextParam, request.url))
+    }
     url.pathname = "/"
+    url.search = ""
     return NextResponse.redirect(url)
   }
 

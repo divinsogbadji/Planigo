@@ -2,7 +2,9 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import Dashboard from "@/components/Layout_Principal"
 
-export default async function Page() {
+type SearchParams = Promise<{ openTask?: string; view?: string }>
+
+export default async function Page({ searchParams }: { searchParams: SearchParams }) {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -13,5 +15,14 @@ export default async function Page() {
     .select("*")
     .order("created_at", { ascending: false })
 
-  return <Dashboard initialTasks={tasks ?? []} userId={user.id} />
+  const params = await searchParams
+
+  return (
+    <Dashboard
+      initialTasks={tasks ?? []}
+      userId={user.id}
+      initialOpenTaskId={params.openTask}
+      initialView={params.view}
+    />
+  )
 }
