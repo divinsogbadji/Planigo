@@ -52,28 +52,35 @@ export default function Dashboard({ initialTasks, userId }: DashboardProps) {
 
   // ── Filter tasks based on sidebar state ──
   const filteredTasks = tasks.filter((t) => {
-    // Trash view: show only soft-deleted tasks
-    if (isTrashView) return t.deleted_at != null
-    // All other views: hide soft-deleted tasks
-    if (t.deleted_at) return false
-    // Archive view: show only archived tasks
-    if (isArchiveView) return t.is_archived === true
-    // Normal views: hide archived tasks
-    if (t.is_archived) return false
+    // ── Visibility: which bucket this task belongs to ──
+    if (isTrashView) {
+      if (t.deleted_at == null) return false
+    } else if (isArchiveView) {
+      if (t.deleted_at != null) return false
+      if (t.is_archived !== true) return false
+    } else {
+      if (t.deleted_at != null) return false
+      if (t.is_archived) return false
+    }
 
+    // ── Category / priority filters apply to every view ──
     if (activeCategory !== "all" && t.category !== activeCategory) return false
     if (activePriority !== "all" && t.priority !== activePriority) return false
-    if (activeNav === "today") {
-      if (!t.due_date) return false
-      return new Date(t.due_date).toDateString() === new Date().toDateString()
-    }
-    if (activeNav === "week") {
-      if (!t.due_date) return false
-      const now = new Date()
-      const weekEnd = new Date(now)
-      weekEnd.setDate(now.getDate() + 7)
-      const d = new Date(t.due_date)
-      return d >= now && d <= weekEnd
+
+    // ── Date filters only apply to active (non-archive, non-trash) views ──
+    if (!isArchiveView && !isTrashView) {
+      if (activeNav === "today") {
+        if (!t.due_date) return false
+        return new Date(t.due_date).toDateString() === new Date().toDateString()
+      }
+      if (activeNav === "week") {
+        if (!t.due_date) return false
+        const now = new Date()
+        const weekEnd = new Date(now)
+        weekEnd.setDate(now.getDate() + 7)
+        const d = new Date(t.due_date)
+        return d >= now && d <= weekEnd
+      }
     }
     return true
   })
