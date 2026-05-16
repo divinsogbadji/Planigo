@@ -34,6 +34,8 @@ export default function Dashboard({ initialTasks, userId, initialOpenTaskId, ini
   const { toast } = useToast()
   const { t, locale } = useTranslation()
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  // Mobile sidebar drawer state — controlled here so the topbar hamburger and the sidebar share it
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   // Resolve initial nav from the URL ?view= deep-link
   const initialNav: NavItem =
     initialView === "archive" ? "archived" : initialView === "trash" ? "trash" : "all"
@@ -448,12 +450,20 @@ export default function Dashboard({ initialTasks, userId, initialOpenTaskId, ini
         onNavChange={setActiveNav}
         onCategoryChange={setActiveCategory}
         onPriorityChange={setActivePriority}
+        mobileOpen={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
       />
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Topbar onNewTask={openNew} onSuggestPlan={() => setAiDialogOpen(true)} tasks={tasks.filter((tk) => !tk.is_archived && !tk.deleted_at)} onSelectTask={openEdit} />
+        <Topbar
+          onNewTask={openNew}
+          onSuggestPlan={() => setAiDialogOpen(true)}
+          tasks={tasks.filter((tk) => !tk.is_archived && !tk.deleted_at)}
+          onSelectTask={openEdit}
+          onOpenMenu={() => setMobileMenuOpen(true)}
+        />
 
-        <main className="flex-1 space-y-6 overflow-y-auto p-6">
+        <main className="flex-1 space-y-4 overflow-y-auto p-3 sm:space-y-6 sm:p-4 md:p-6">
           {!isArchiveView && !isTrashView && <CalendarView tasks={tasks.filter(tk => !tk.is_archived && !tk.deleted_at)} onReschedule={handleReschedule} />}
           {isArchiveView && (() => {
             const now = new Date()

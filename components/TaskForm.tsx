@@ -159,7 +159,7 @@ export function TaskForm({ open, onOpenChange, task, onSubmit, readOnly = false 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="glass border-white/10 sm:max-w-md">
+      <DialogContent className="glass border-white/10 sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-white">{readOnly ? t("form.taskDetails") : isEditing ? t("form.editTask") : t("form.newTask")}</DialogTitle>
         </DialogHeader>

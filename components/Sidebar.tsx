@@ -1,7 +1,7 @@
 "use client"
 import { useState } from "react"
 import Link from "next/link"
-import { Archive, CalendarDays, CalendarRange, Globe, ListTodo, User, Briefcase, GraduationCap, Plane, Heart, Wallet, Palette, Sparkles, LogOut, ArrowDown, ArrowRight, ArrowUp, Filter, UserCog, ChevronDown, Trash2 } from "lucide-react"
+import { Archive, CalendarDays, CalendarRange, Globe, ListTodo, User, Briefcase, GraduationCap, Plane, Heart, Wallet, Palette, Sparkles, LogOut, ArrowDown, ArrowRight, ArrowUp, Filter, UserCog, ChevronDown, Trash2, X } from "lucide-react"
 import { logout } from "@/app/(auth)/actions"
 import { useTranslation } from "@/lib/i18n"
 
@@ -16,6 +16,10 @@ interface SidebarProps {
   onNavChange?: (nav: NavItem) => void
   onCategoryChange?: (cat: CategoryFilter) => void
   onPriorityChange?: (p: PriorityFilter) => void
+  /** Mobile drawer state — when true, the off-canvas drawer slides in (mobile/tablet only). */
+  mobileOpen?: boolean
+  /** Called to close the mobile drawer (overlay click, nav selection, close button). */
+  onClose?: () => void
 }
 
 const navKeys: { key: NavItem; tKey: "nav.today" | "nav.week" | "nav.allTasks" | "nav.archived" | "nav.trash"; icon: React.ElementType }[] = [
@@ -44,7 +48,7 @@ const catKeys: { key: CategoryFilter; tKey: "cat.all" | "cat.personal" | "cat.wo
   { key: "hobby", tKey: "cat.hobby", icon: Palette, color: "text-fuchsia-400" },
 ]
 
-export function Sidebar({ activeNav: controlledNav, activeCategory: controlledCategory, activePriority: controlledPriority, onNavChange, onCategoryChange, onPriorityChange }: SidebarProps) {
+export function Sidebar({ activeNav: controlledNav, activeCategory: controlledCategory, activePriority: controlledPriority, onNavChange, onCategoryChange, onPriorityChange, mobileOpen = false, onClose }: SidebarProps) {
   const [internalNav, setInternalNav] = useState<NavItem>("all")
   const [internalCategory, setInternalCategory] = useState<CategoryFilter>("all")
   const [internalPriority, setInternalPriority] = useState<PriorityFilter>("all")
@@ -55,20 +59,31 @@ export function Sidebar({ activeNav: controlledNav, activeCategory: controlledCa
   const activePriority = controlledPriority ?? internalPriority
   const { t, locale, setLocale } = useTranslation()
 
-  function handleNav(nav: NavItem) { setInternalNav(nav); onNavChange?.(nav) }
+  // Auto-close the mobile drawer on nav selection (filters keep it open so the user can chain them)
+  function handleNav(nav: NavItem) { setInternalNav(nav); onNavChange?.(nav); onClose?.() }
   function handleCategory(cat: CategoryFilter) { setInternalCategory(cat); onCategoryChange?.(cat) }
   function handlePriority(p: PriorityFilter) { setInternalPriority(p); onPriorityChange?.(p) }
 
-  return (
-    <aside className="glass flex w-64 shrink-0 flex-col border-r border-white/5">
+  // Inner content shared between the desktop aside and the mobile drawer.
+  const inner = (
+    <>
       {/* Logo — fixed top */}
-      <div className="shrink-0 px-5 pt-5 pb-2">
+      <div className="shrink-0 px-5 pt-5 pb-2 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="gradient-primary flex size-9 items-center justify-center rounded-xl shadow-glow-indigo">
             <Sparkles className="size-5 text-white" />
           </div>
           <h1 className="text-xl font-bold tracking-tight text-white">Planigo</h1>
         </div>
+        {/* Close button — visible only inside mobile drawer */}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t("menu.close")}
+          className="lg:hidden flex size-8 items-center justify-center rounded-lg text-white/60 transition-colors hover:bg-white/5 hover:text-white"
+        >
+          <X className="size-5" />
+        </button>
       </div>
 
       {/* Scrollable middle area */}
@@ -156,6 +171,33 @@ export function Sidebar({ activeNav: controlledNav, activeCategory: controlledCa
           </button>
         </form>
       </div>
-    </aside>
+    </>
+  )
+
+  return (
+    <>
+      {/* Desktop sidebar — fixed left rail at lg+ */}
+      <aside className="glass hidden lg:flex w-64 shrink-0 flex-col border-r border-white/5">
+        {inner}
+      </aside>
+
+      {/* Mobile drawer — slides in from left, hidden at lg+ */}
+      <div
+        className={`lg:hidden fixed inset-0 z-50 transition-opacity duration-200 ${mobileOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
+        aria-hidden={!mobileOpen}
+      >
+        <button
+          type="button"
+          aria-label={t("menu.close")}
+          onClick={onClose}
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        />
+        <aside
+          className={`glass relative flex h-full w-72 max-w-[85vw] flex-col border-r border-white/5 shadow-3d-lg transition-transform duration-200 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
+        >
+          {inner}
+        </aside>
+      </div>
+    </>
   )
 }

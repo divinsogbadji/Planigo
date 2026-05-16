@@ -305,6 +305,9 @@ export const translations = {
     "signup.consentCommsRequired": "You must consent to email communications to create an account",
     // Language
     "lang.toggle": "Français",
+    // Mobile menu
+    "menu.open": "Open menu",
+    "menu.close": "Close menu",
   },
   fr: {
     // Navigation
@@ -610,6 +613,9 @@ export const translations = {
     "signup.consentCommsRequired": "Vous devez consentir aux communications par email pour créer un compte",
     // Language
     "lang.toggle": "English",
+    // Mobile menu
+    "menu.open": "Ouvrir le menu",
+    "menu.close": "Fermer le menu",
   },
 } as const
 

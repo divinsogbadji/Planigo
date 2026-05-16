@@ -93,7 +93,7 @@ export function CalendarView({ tasks, onReschedule }: CalendarViewProps) {
   })
 
   return (
-    <div className="glass-card rounded-xl p-4 shadow-3d">
+    <div className="glass-card rounded-xl p-2 shadow-3d sm:p-4">
       {/* Header */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -125,7 +125,8 @@ export function CalendarView({ tasks, onReschedule }: CalendarViewProps) {
 
       {/* ── Week overview (original) ── */}
       {mode === "week" && (
-        <div className="grid grid-cols-7 gap-2">
+        <div className="overflow-x-auto">
+          <div className="grid min-w-[480px] grid-cols-7 gap-1 sm:min-w-0 sm:gap-2">
           {weekDays.map((day) => {
             const dayKey = toISODate(day)
             const dayTasks = getTasksForDay(day)
@@ -146,6 +147,7 @@ export function CalendarView({ tasks, onReschedule }: CalendarViewProps) {
               </div>
             )
           })}
+          </div>
         </div>
       )}
 
@@ -188,7 +190,8 @@ export function CalendarView({ tasks, onReschedule }: CalendarViewProps) {
 
       {/* ── Month view ── */}
       {mode === "month" && (
-        <div>
+        <div className="overflow-x-auto">
+          <div className="min-w-[480px] sm:min-w-0">
           <div className="grid grid-cols-7 gap-px mb-1">
             {dayNames.map((dn) => (
               <div key={dn} className="py-1 text-center text-[10px] font-medium uppercase text-muted-foreground">{dn}</div>
@@ -211,6 +214,7 @@ export function CalendarView({ tasks, onReschedule }: CalendarViewProps) {
                 </div>
               )
             })}
+          </div>
           </div>
         </div>
       )}
