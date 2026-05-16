@@ -6,6 +6,7 @@
 
 const MODELS = ["gemini-2.0-flash", "gemini-2.0-flash-lite"]
 const MAX_RETRIES = 1
+const TIMEOUT_MS = 15_000
 
 export async function generateTasks(prompt: string): Promise<string> {
   const key = process.env.GEMINI_API_KEY
@@ -13,6 +14,9 @@ export async function generateTasks(prompt: string): Promise<string> {
 
   for (const model of MODELS) {
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
+
       try {
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
@@ -23,6 +27,7 @@ export async function generateTasks(prompt: string): Promise<string> {
               contents: [{ parts: [{ text: prompt }] }],
               generationConfig: { temperature: 0.7 },
             }),
+            signal: controller.signal,
           }
         )
 
@@ -44,6 +49,8 @@ export async function generateTasks(prompt: string): Promise<string> {
         return text
       } catch (err) {
         if (attempt === MAX_RETRIES) throw err
+      } finally {
+        clearTimeout(timeout)
       }
     }
   }

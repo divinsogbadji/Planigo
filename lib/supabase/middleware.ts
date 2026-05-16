@@ -99,7 +99,16 @@ export async function updateSession(request: NextRequest) {
   // /reset-password is intentionally excluded: the user is in a recovery session
   // (created by /auth/callback after exchanging the email code) and must stay on
   // that page to set their new password.
-  if (user && isPublicRoute && pathname !== "/auth/callback" && pathname !== "/reset-password") {
+  // /api/* is excluded: API routes are listed as public so unauthenticated calls
+  // (cron, welcome-email) pass through, but logged-in client fetches must NOT be
+  // redirected to "/" (would return HTML and break JSON parsing).
+  if (
+    user &&
+    isPublicRoute &&
+    pathname !== "/auth/callback" &&
+    pathname !== "/reset-password" &&
+    !pathname.startsWith("/api/")
+  ) {
     const url = request.nextUrl.clone()
     const nextParam = request.nextUrl.searchParams.get("next")
     // Only honor relative paths to avoid open-redirect vulnerabilities

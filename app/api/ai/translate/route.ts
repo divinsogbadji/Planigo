@@ -7,16 +7,20 @@ import { NextRequest, NextResponse } from "next/server"
 import * as openrouter from "@/lib/ai/providers/openrouter"
 import * as gemini from "@/lib/ai/providers/gemini"
 import * as ollama from "@/lib/ai/providers/ollama"
+import { requireUser } from "@/lib/supabase/requireUser"
+
+export const maxDuration = 60
 
 interface Provider {
   name: string
   fn: (prompt: string) => Promise<string>
 }
 
+// Order: Gemini first (typically fastest free tier), then OpenRouter, then Ollama (dev only).
 const providers: Provider[] = [
-  { name: "OpenRouter", fn: openrouter.generateTasks },
   { name: "Gemini",     fn: gemini.generateTasks },
-  { name: "Ollama",     fn: ollama.generateTasks },
+  { name: "OpenRouter", fn: openrouter.generateTasks },
+  ...(process.env.NODE_ENV === "development" ? [{ name: "Ollama", fn: ollama.generateTasks }] : []),
 ]
 
 function buildTranslatePrompt(title: string, description: string, sourceLang: string): string {
@@ -40,14 +44,23 @@ JSON format:
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireUser()
+  if (auth.response) return auth.response
+
   try {
-    const { title, description, locale } = await req.json()
-
-    if (!title || typeof title !== "string") {
-      return NextResponse.json({ error: "Missing title" }, { status: 400 })
+    const body = await req.json().catch(() => null)
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
     }
+    const { title, description, locale } = body as { title?: unknown; description?: unknown; locale?: unknown }
 
-    const prompt = buildTranslatePrompt(title, description || "", locale || "en")
+    if (typeof title !== "string" || title.trim().length < 1 || title.length > 500) {
+      return NextResponse.json({ error: "Missing or invalid title" }, { status: 400 })
+    }
+    const safeDescription = typeof description === "string" ? description.slice(0, 2000) : ""
+    const safeLocale = locale === "fr" || locale === "en" ? locale : "en"
+
+    const prompt = buildTranslatePrompt(title, safeDescription, safeLocale)
 
     for (const { name, fn } of providers) {
       try {
@@ -79,7 +92,7 @@ export async function POST(req: NextRequest) {
     // All providers failed — return empty (caller will handle gracefully)
     return NextResponse.json({ title: null, description: null })
   } catch (error) {
-    console.error("[Translate] Server error:", error)
+    console.error("[Translate] Server error:", (error as Error).message)
     return NextResponse.json({ error: "Translation service unavailable" }, { status: 503 })
   }
 }
