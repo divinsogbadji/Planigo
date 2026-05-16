@@ -16,11 +16,11 @@ interface Provider {
   fn: (prompt: string) => Promise<string>
 }
 
-// Order: Gemini first (typically fastest free tier), then OpenRouter, then Ollama (dev only).
+// Order kept intentional: OpenRouter → Gemini → Ollama (matches /api/ai/suggest-plan).
 const providers: Provider[] = [
-  { name: "Gemini",     fn: gemini.generateTasks },
   { name: "OpenRouter", fn: openrouter.generateTasks },
-  ...(process.env.NODE_ENV === "development" ? [{ name: "Ollama", fn: ollama.generateTasks }] : []),
+  { name: "Gemini",     fn: gemini.generateTasks },
+  { name: "Ollama",     fn: ollama.generateTasks },
 ]
 
 function buildTranslatePrompt(title: string, description: string, sourceLang: string): string {

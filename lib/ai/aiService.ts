@@ -74,11 +74,12 @@ interface Provider {
   fn: (prompt: string) => Promise<string>
 }
 
-// Order: Gemini first (typically fastest free tier), then OpenRouter, then Ollama (dev only).
+// Order kept intentional: OpenRouter first (most reliable free quota for this app),
+// Gemini as fallback (sometimes refuses on quota), Ollama last (local dev only).
 const providers: Provider[] = [
-  { name: "Gemini",     fn: gemini.generateTasks },
   { name: "OpenRouter", fn: openrouter.generateTasks },
-  ...(process.env.NODE_ENV === "development" ? [{ name: "Ollama", fn: ollama.generateTasks }] : []),
+  { name: "Gemini",     fn: gemini.generateTasks },
+  { name: "Ollama",     fn: ollama.generateTasks },
 ]
 
 // ─── Main entry point ───────────────────────────────────────────────
