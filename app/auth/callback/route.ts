@@ -4,7 +4,10 @@ import { createClient } from "@/lib/supabase/server"
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get("code")
-  const next = searchParams.get("next") ?? "/"
+  const nextRaw = searchParams.get("next") ?? "/"
+  // Restrict `next` to relative paths to prevent open-redirect vulnerabilities.
+  const next = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/"
+  const isRecovery = next.startsWith("/reset-password")
 
   if (code) {
     const supabase = await createClient()
@@ -15,7 +18,12 @@ export async function GET(request: Request) {
     }
   }
 
-  // If there's no code or an error, redirect to login with error
-  return NextResponse.redirect(`${origin}/login?error=Could+not+authenticate`)
+  // Failed (no code, expired, or already-used). For password recovery we keep
+  // the user on the reset page with an explicit "link invalid" flag so they
+  // can request a new email; otherwise fall back to the login banner.
+  if (isRecovery) {
+    return NextResponse.redirect(`${origin}/reset-password?invalid=1`)
+  }
+  return NextResponse.redirect(`${origin}/login?errorCode=unknown`)
 }
 

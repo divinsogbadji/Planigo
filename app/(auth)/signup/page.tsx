@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, Suspense } from "react"
+import { useState, Suspense, useMemo } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { signup } from "@/app/(auth)/actions"
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertTriangle, CheckCircle2, Mail, Loader2 } from "lucide-react"
-import { useTranslation } from "@/lib/i18n"
+import { useTranslation, type TranslationKey } from "@/lib/i18n"
 
 interface FieldErrors {
   firstName?: string
@@ -19,6 +19,16 @@ interface FieldErrors {
   confirmPassword?: string
   consent?: string
   consentComms?: string
+  form?: string
+}
+
+// Maps a server-side error code to (field, translation key) so each Supabase
+// error is rendered under the input it concerns instead of a generic banner.
+const SIGNUP_ERROR_MAP: Record<string, { field: keyof FieldErrors; key: TranslationKey }> = {
+  user_already_exists: { field: "email", key: "authErr.userAlreadyExists" },
+  weak_password: { field: "password", key: "authErr.weakPassword" },
+  rate_limit: { field: "form", key: "authErr.rateLimit" },
+  unknown: { field: "form", key: "authErr.unknown" },
 }
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[@$!%*?&])[A-Za-z0-9@$!%*?&]{8,}$/
@@ -33,14 +43,24 @@ export default function SignupPage() {
 
 function SignupForm() {
   const searchParams = useSearchParams()
-  const serverError = searchParams.get("error")
+  const errorCode = searchParams.get("errorCode")
+  const legacyServerError = searchParams.get("error")
   const successMessage = searchParams.get("success")
   const { t } = useTranslation()
+
+  // Resolve a server-side error code into a (field, message) pair so the error
+  // appears next to the relevant input rather than as a generic banner.
+  const serverFieldErrors = useMemo<FieldErrors>(() => {
+    if (!errorCode) return {}
+    const entry = SIGNUP_ERROR_MAP[errorCode] ?? SIGNUP_ERROR_MAP.unknown
+    return { [entry.field]: t(entry.key) }
+  }, [errorCode, t])
 
   const [errors, setErrors] = useState<FieldErrors>({})
   const [submitting, setSubmitting] = useState(false)
   const [consentChecked, setConsentChecked] = useState(false)
   const [consentCommsChecked, setConsentCommsChecked] = useState(false)
+  const displayedErrors: FieldErrors = { ...serverFieldErrors, ...errors }
 
   function validate(formData: FormData): FieldErrors {
     const errs: FieldErrors = {}
@@ -124,10 +144,10 @@ function SignupForm() {
             </div>
           )}
 
-          {serverError && (
+          {(displayedErrors.form || legacyServerError) && (
             <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
               <AlertTriangle className="size-4 shrink-0" />
-              {serverError}
+              {displayedErrors.form ?? legacyServerError}
             </div>
           )}
 
@@ -135,26 +155,26 @@ function SignupForm() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="firstName">{t("signup.firstName")}</Label>
-                <Input id="firstName" name="firstName" type="text" placeholder="John" aria-invalid={!!errors.firstName} className={fieldClass(errors.firstName)} />
-                {errors.firstName && <p className="text-xs text-red-400">{errors.firstName}</p>}
+                <Input id="firstName" name="firstName" type="text" placeholder="John" aria-invalid={!!displayedErrors.firstName} className={fieldClass(displayedErrors.firstName)} />
+                {displayedErrors.firstName && <p className="text-xs text-red-400">{displayedErrors.firstName}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="lastName">{t("signup.lastName")}</Label>
-                <Input id="lastName" name="lastName" type="text" placeholder="Doe" aria-invalid={!!errors.lastName} className={fieldClass(errors.lastName)} />
-                {errors.lastName && <p className="text-xs text-red-400">{errors.lastName}</p>}
+                <Input id="lastName" name="lastName" type="text" placeholder="Doe" aria-invalid={!!displayedErrors.lastName} className={fieldClass(displayedErrors.lastName)} />
+                {displayedErrors.lastName && <p className="text-xs text-red-400">{displayedErrors.lastName}</p>}
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="email">{t("login.email")}</Label>
-              <Input id="email" name="email" type="email" placeholder="you@example.com" aria-invalid={!!errors.email} className={fieldClass(errors.email)} />
-              {errors.email && <p className="text-xs text-red-400">{errors.email}</p>}
+              <Input id="email" name="email" type="email" placeholder="you@example.com" aria-invalid={!!displayedErrors.email} className={fieldClass(displayedErrors.email)} />
+              {displayedErrors.email && <p className="text-xs text-red-400">{displayedErrors.email}</p>}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="password">{t("login.password")}</Label>
-              <Input id="password" name="password" type="password" placeholder="••••••••" aria-invalid={!!errors.password} className={fieldClass(errors.password)} />
-              {errors.password && <p className="text-xs text-red-400">{errors.password}</p>}
+              <Input id="password" name="password" type="password" placeholder="••••••••" aria-invalid={!!displayedErrors.password} className={fieldClass(displayedErrors.password)} />
+              {displayedErrors.password && <p className="text-xs text-red-400">{displayedErrors.password}</p>}
               <ul className="space-y-0.5 text-[11px] text-muted-foreground">
                 <li>• {t("password.minLength")}</li>
                 <li>• {t("password.uppercase")}</li>
@@ -166,8 +186,8 @@ function SignupForm() {
 
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">{t("signup.confirmPassword")}</Label>
-              <Input id="confirmPassword" name="confirmPassword" type="password" placeholder="••••••••" aria-invalid={!!errors.confirmPassword} className={fieldClass(errors.confirmPassword)} />
-              {errors.confirmPassword && <p className="text-xs text-red-400">{errors.confirmPassword}</p>}
+              <Input id="confirmPassword" name="confirmPassword" type="password" placeholder="••••••••" aria-invalid={!!displayedErrors.confirmPassword} className={fieldClass(displayedErrors.confirmPassword)} />
+              {displayedErrors.confirmPassword && <p className="text-xs text-red-400">{displayedErrors.confirmPassword}</p>}
             </div>
 
             <div className="space-y-2">

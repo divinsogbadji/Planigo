@@ -33,6 +33,11 @@ function subscribeLocale(cb: () => void) {
 function getLocaleSnapshot(): Locale {
   const saved = localStorage.getItem(STORAGE_KEY) as Locale | null
   if (saved === "en" || saved === "fr") return saved
+  // No explicit choice yet: try the browser locale (e.g. "fr-FR", "en-US").
+  // We only honor the language subtag and fall back to DEFAULT_LOCALE for anything else.
+  const navLang = (typeof navigator !== "undefined" ? navigator.language : "")?.toLowerCase()
+  if (navLang.startsWith("fr")) return "fr"
+  if (navLang.startsWith("en")) return "en"
   return DEFAULT_LOCALE
 }
 function getLocaleServerSnapshot(): Locale {

@@ -9,15 +9,37 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Call notify-deadlines endpoint
+      - name: Call notify-deadlines endpoint (with retry)
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          response=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.APP_URL }}/api/notify-deadlines")
-          echo "HTTP status: $response"
-          if [ "$response" != "200" ]; then
-            echo "::error::Endpoint returned $response"
-            exit 1
-          fi
+          attempt=1
+          max_attempts=4
+          last_status="000"
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt/$max_attempts..."
+            last_status=$(curl -sS -o /tmp/response.txt -w "%{http_code}" \
+              --max-time 60 \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              "$APP_URL/api/notify-deadlines" || echo "000")
+            echo "HTTP status: $last_status"
+            if [ "$last_status" = "200" ]; then
+              echo "Success on attempt $attempt"
+              cat /tmp/response.txt || true
+              echo ""
+              exit 0
+            fi
+            if [ $attempt -lt $max_attempts ]; then
+              backoff=$((attempt * 30))
+              echo "Failed (HTTP $last_status). Retrying in ${backoff}s..."
+              sleep $backoff
+            fi
+            attempt=$((attempt + 1))
+          done
+          echo "::error::Endpoint failed after $max_attempts attempts (last status: $last_status)"
+          cat /tmp/response.txt || true
+          exit 1
 

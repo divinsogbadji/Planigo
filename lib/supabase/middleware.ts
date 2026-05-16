@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 // Routes that don't require authentication
-const publicRoutes = ["/login", "/signup", "/auth/callback", "/privacy", "/faq", "/api/"]
+const publicRoutes = ["/login", "/signup", "/forgot-password", "/reset-password", "/auth/callback", "/privacy", "/faq", "/api/"]
 
 // Maximum session inactivity: 8 hours (in seconds)
 const MAX_INACTIVITY_SECONDS = 8 * 60 * 60 // 28800s = 8 hours
@@ -96,7 +96,10 @@ export async function updateSession(request: NextRequest) {
   }
 
   // If logged in and trying to access login/signup → redirect to home (or to ?next= if present)
-  if (user && isPublicRoute && pathname !== "/auth/callback") {
+  // /reset-password is intentionally excluded: the user is in a recovery session
+  // (created by /auth/callback after exchanging the email code) and must stay on
+  // that page to set their new password.
+  if (user && isPublicRoute && pathname !== "/auth/callback" && pathname !== "/reset-password") {
     const url = request.nextUrl.clone()
     const nextParam = request.nextUrl.searchParams.get("next")
     // Only honor relative paths to avoid open-redirect vulnerabilities
